@@ -4,11 +4,9 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-#include <signal.h>
 #include <errno.h>
 #include <sched.h>
 #include <sys/mman.h>
-#include <pthread.h>
 #include <math.h>
 #include <signal.h>
 #include <ros/ros.h>
@@ -336,30 +334,22 @@ int read_from_mc( const int fd )
 	int available;
 	int rd = 0;
 
-	//if ( Serial.available() < FRAME_LENGTH )
-		//return 0;
 	if ( ioctl( fd, FIONREAD, &available ) == -1 )
 		fprintf( stderr, "Failed to get the amount of available data from MC: %s\n", strerror( errno ) );
 	else if ( available < FRAME_LENGTH )
 		return 0;
 
-	//while ( Serial.available() > FRAME_LENGTH*N_LAST_FRAMES )
-		//Serial.read();
 	while ( available - FRAME_LENGTH*N_LAST_FRAMES )
 	{
 		rd = read( fd, discard_buf, std::min( 1024, available - FRAME_LENGTH*N_LAST_FRAMES ) );
 		available -= rd;
 	}
 
-	//for ( int i = 0 ; i < FRAME_LENGTH - 1 ; i++ )
-		//rd_buf[i] = Serial.read();
 	rd = read( fd, rd_buf, FRAME_LENGTH - 1 );
 
 	int buf_pos = 0;
-	//while ( Serial.available() >= 1 )
 	while ( ioctl( fd, FIONREAD, &available ) != -1 && available >= 1 )
 	{
-		//rd_buf[(buf_pos+FRAME_LENGTH-1)%FRAME_LENGTH] = Serial.read();
 		rd = read( fd, rd_buf + ( buf_pos + FRAME_LENGTH - 1 )%FRAME_LENGTH, 1 );
 
 		switch ( rd_buf[buf_pos%FRAME_LENGTH] )
@@ -492,12 +482,12 @@ int main( int argc, char **argv )
 	std_msgs::String msg;
 
 
-	// Modification of MC controller gains:
+	// Modification of MC control gains:
 
 	//send_cmd1( mc_fd, CMD_MOTOR_1_POS_SET_KP, 2 );
 	//send_cmd1( mc_fd, CMD_MOTOR_1_VEL_SET_KP, 1 );
 	//send_cmd1( mc_fd, CMD_MOTOR_1_VEL_SET_KI, 1 );
-	//send_cmd1( mc_fd, CMD_MOTOR_1_SET_MAX_VEL, 5 );
+	send_cmd1( mc_fd, CMD_MOTOR_1_SET_MAX_VEL, 15 );
 	//send_cmd1( mc_fd, CMD_MOTOR_1_SET_POS_PREC, 0.5 );
 
 	//sleep( 1 );
@@ -531,9 +521,9 @@ int main( int argc, char **argv )
 	ros::Duration cmd_nav_timeout( CMD_NAV_TIMEOUT );
 	bool cmd_nav_connected = false;
 
-	ros::Time current_time;
-	ros::Time last_time = ros::Time::now();
-	double dt;
+	//ros::Time current_time;
+	//ros::Time last_time = ros::Time::now();
+	//double dt;
 
 	while ( ros::ok() )
 	{
@@ -571,22 +561,6 @@ int main( int argc, char **argv )
 		beta = cj_angle*DEG_TO_RAD;
 		dbeta_dt = cj_rate*DEG_TO_RAD;
 		
-		//for ( int i = 0 ; i < 4 ; i++ )
-		//{
-			//omega_steer = ( i/2 ? -1 : 1 )*( -WBASE*tan( beta*0.5 ) + ( i%2 ? -1 : 1 )*WTRACK )*dbeta_dt*0.25*_wradius;
-			//omega_turn = ( i%2 ? -1 : 1 )*wtrack_wbase*tan( beta*0.5 )*speed_cmd_filtered*_wradius;
-			//w_cmd[i] = speed_cmd_filtered*_wradius + omega_steer + omega_turn;
-
-			// Watch wheel speed limit:
-			//if ( w_cmd[i] > WSPEED_MAX )
-			//{
-				//std::stringstream ss;
-				//ss << "<!> Speed exceeded for wheel " << i << " (" << w_cmd[i] << "/" << WSPEED_MAX << ")";
-				//msg.data = ss.str();
-				//info_ctrl_pub.publish( msg );
-			//}
-		//}
-
 		float diff[4];
 		float _1diff[4];
 		float trans[4];
@@ -620,7 +594,7 @@ int main( int argc, char **argv )
 			else
 				final_speed = std::max( final_speed, ( (float) -WSPEED_MAX*WRADIUS - trans[i] )*_1diff[i] );
 
-		// Compute corresponding the speed for each wheel:
+		// Compute the corresponding speed for each wheel:
 		for ( int i = 0 ; i < 4 ; i++ )
 			w_cmd[i] = ( final_speed*( 1 + diff[i] ) + trans[i] )*_wradius;
 
@@ -640,19 +614,16 @@ int main( int argc, char **argv )
 			send_cmd1( mc_fd, CMD_MOTOR_2_TOR, torque_cmd );
 		}
 
-		//printf( "angle_A: %f | vel_A: %f | b_angle: %f | b_torque: %f | loop duration: %f\n", cj_angle, cj_rate, sea_angle, sea_torque, dt );
-		//printf( "angle_A: %f | vel_A: %f | angle_B: %f | angle_C: %f | loop duration: %f\n", cj_angle, cj_rate, sea_angle, sea_torque, dt );
-		//printf( "err1vel: %f | interr1vel: %f | pct_1: %f | pct_2: %f | loop duration: %f\n", cj_angle, cj_rate, sea_angle, sea_torque, dt );
-		//printf( "err1vel: %f | interr1vel: %f | vel_A: %f | filtered_vel: %f\n", cj_angle, cj_rate, sea_angle, sea_torque );
+		//printf( "angle_A: %f | vel_A: %f | boggie_angle: %f | boggie_torque: %f | loop duration: %f\n", cj_angle, cj_rate, sea_angle, sea_torque, dt );
 		//printf( "%f %f %f %f\n", w_cmd[0], w_cmd[1], w_cmd[2], w_cmd[3] );
 
 		read_from_wmc( wmc_F_fd, wmc_B_fd );
 
 		loop_rate.sleep();
 
-		current_time = ros::Time::now();
-		dt = ( current_time - last_time ).toSec();
-		last_time = current_time;
+		//current_time = ros::Time::now();
+		//dt = ( current_time - last_time ).toSec();
+		//last_time = current_time;
 	}
 
 	return 0;
