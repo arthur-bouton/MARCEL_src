@@ -21,3 +21,6 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 add_executable(nav_node src/nav_node.cpp)
 target_link_libraries(nav_node ${catkin_LIBRARIES})
 add_dependencies(nav_node rover_ctrl_generate_messages_cpp)
+
+add_executable(read_state src/read_state.cpp)
+target_link_libraries(read_state ${catkin_LIBRARIES})
