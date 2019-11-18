@@ -24,6 +24,13 @@
 #define INC_OFFSET_X 0.8 // °
 #define INC_OFFSET_Y 2.0 // °
 
+const float offset_fx[2] = { -25.72, 5.12 };
+const float offset_fy[2] = { -86.85, -165.43 };
+const float offset_fz[2] = { -49.03, -39.12 };
+const float offset_tx[2] = { -1.739, -2.390 };
+const float offset_ty[2] = { 0.545, 0.516 };
+const float offset_tz[2] = { -0.699, -0.497 };
+
 
 #define RAD_TO_DEG 57.29577951308232
 
@@ -114,15 +121,19 @@ float tx[2] = { 0 };
 float ty[2] = { 0 };
 float tz[2] = { 0 };
 
+bool ft_dirty[2] = { false };
+
 void wrench_rcv_Callback( const geometry_msgs::WrenchStamped::ConstPtr& msg, int id )
 {
 	ft_time[id] = msg->header.stamp.toSec();
-	fx[id] = msg->wrench.force.x;
-	fy[id] = msg->wrench.force.y;
-	fz[id] = msg->wrench.force.z;
-	tx[id] = msg->wrench.torque.x;
-	ty[id] = msg->wrench.torque.y;
-	tz[id] = msg->wrench.torque.z;
+	fx[id] = msg->wrench.force.x - offset_fx[id];
+	fy[id] = msg->wrench.force.y - offset_fy[id];
+	fz[id] = msg->wrench.force.z - offset_fz[id];
+	tx[id] = msg->wrench.torque.x - offset_tx[id];
+	ty[id] = msg->wrench.torque.y - offset_ty[id];
+	tz[id] = msg->wrench.torque.z - offset_tz[id];
+
+	ft_dirty[id] = true;
 }
 
 
@@ -167,9 +178,12 @@ int main( int argc, char **argv )
 		ros::spinOnce();
 
 
-		time = ros::Time::now();
-		printf( "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n", time.toSec(), angle_x, angle_y, fx[0], fy[0], fz[0], tx[0], ty[0], tz[0], fx[1], fy[1], fz[1], tx[1], ty[1], tz[1] );
-		fflush( stdout );
+		if ( ft_dirty[0] && ft_dirty[1] )
+		{
+			time = ros::Time::now();
+			printf( "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n", time.toSec(), angle_x, angle_y, fx[0], fy[0], fz[0], tx[0], ty[0], tz[0], fx[1], fy[1], fz[1], tx[1], ty[1], tz[1] );
+			fflush( stdout );
+		}
 
 
 		loop_rate.sleep();
