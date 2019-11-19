@@ -6,6 +6,7 @@
 #include <ros/ros.h>
 #include "geometry_msgs/WrenchStamped.h"
 #include "std_msgs/String.h"
+#include "robotiq_ft_sensor/sensor_accessor.h"
 #include <functional>   // std::bind
 
 #include <linux/spi/spidev.h>
@@ -23,6 +24,10 @@
 
 #define INC_OFFSET_X 0.8 // °
 #define INC_OFFSET_Y 2.0 // °
+
+
+#define FT_SERIAL_NUMBER_FRONT "  F-31951"
+#define FT_SERIAL_NUMBER_REAR  "  F-31952"
 
 const float offset_fx[2] = { -25.72, 5.12 };
 const float offset_fy[2] = { -86.85, -165.43 };
@@ -149,9 +154,40 @@ int main( int argc, char **argv )
 	nh.param( "loop_rate", loop_freq, (float) LOOP_FREQ );
 	ros::Rate loop_rate( loop_freq );
 
+	std::string ft_serial_numbers[2];
+	nh.param<std::string>( "ft_serial_number_front", ft_serial_numbers[0], std::string( FT_SERIAL_NUMBER_FRONT ) );
+	nh.param<std::string>( "ft_serial_number_rear", ft_serial_numbers[1], std::string( FT_SERIAL_NUMBER_REAR ) );
 
-	ros::Subscriber sub_f = nh.subscribe<geometry_msgs::WrenchStamped>( "wrench_front", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, 0 ) );
-	ros::Subscriber sub_r = nh.subscribe<geometry_msgs::WrenchStamped>( "wrench_rear", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, 1 ) );
+
+	// Identification of each FT sensor:
+	int ft_ids[2] = { -1 };
+	for ( int i=0 ; i < 2 ; i++ )
+	{
+		ros::ServiceClient svr_client = nh.serviceClient<robotiq_ft_sensor::sensor_accessor>( std::string( "ft_request_" ) + std::to_string( i ) );
+		robotiq_ft_sensor::sensor_accessor srv;
+		srv.request.command_id = robotiq_ft_sensor::sensor_accessor::Request::COMMAND_GET_SERIAL_NUMBER;
+		if ( svr_client.call( srv ) )
+		{
+			ROS_INFO( "Serial number of FT sensor %i: [%s]", i, srv.response.res.c_str() );
+			for ( int j=0 ; j < 2 ; j++ )
+				if ( srv.response.res == ft_serial_numbers[j] )
+					ft_ids[i] = j;
+		}
+		else
+		{
+			ROS_ERROR( "Failed to call service sensor_accessor" );
+			return -1;
+		}
+	}
+	if ( ft_ids[0] == -1 || ft_ids[1] == -1 )
+	{
+		fprintf( stderr, "Failed to identify both FT sensors\n" );
+		return -1;
+	}
+
+
+	ros::Subscriber sub_f = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_0", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[0] ) );
+	ros::Subscriber sub_r = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_1", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[1] ) );
 
 
 	int inc_fd = setup_spi( std::vector<unsigned int>{ INC_CSB } );
@@ -181,7 +217,8 @@ int main( int argc, char **argv )
 		if ( ft_dirty[0] && ft_dirty[1] )
 		{
 			time = ros::Time::now();
-			printf( "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n", time.toSec(), angle_x, angle_y, fx[0], fy[0], fz[0], tx[0], ty[0], tz[0], fx[1], fy[1], fz[1], tx[1], ty[1], tz[1] );
+			printf( "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n", time.toSec(), angle_x, angle_y,
+			        fx[0], fy[0], fz[0], tx[0], ty[0], tz[0], fx[1], fy[1], fz[1], tx[1], ty[1], tz[1] );
 			fflush( stdout );
 		}
 
