@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sshpass -p pi ssh -t ubuntu@10.42.0.1 "echo pi | sudo -S date -s @`(date -u +"%s")`"

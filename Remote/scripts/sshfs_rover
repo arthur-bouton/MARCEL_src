@@ -1,0 +1,13 @@
+#!/bin/bash
+
+mountpoint=/home/ab0113/Desktop/rover_ws_fs
+
+if [[ $# -ge 1 && $1 == "-u" ]]; then
+	fusermount -u $mountpoint
+else
+	if [[ $# -ge 1 && $1 == "-d" ]]; then
+		sshpass -p pi ssh -t ubuntu@10.42.0.1 "echo pi | sudo -S date -s @`(date -u +"%s")`"
+	fi
+
+	echo pi | sshfs -o password_stdin -o Ciphers=aes128-ctr ubuntu@10.42.0.1:/home/ubuntu/catkin_ws $mountpoint
+fi

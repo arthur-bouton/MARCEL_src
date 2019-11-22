@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sshpass -p pi ssh -c aes128-ctr ubuntu@10.42.0.1
