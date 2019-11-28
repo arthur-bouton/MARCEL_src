@@ -131,12 +131,12 @@ bool ft_dirty[2] = { false };
 void wrench_rcv_Callback( const geometry_msgs::WrenchStamped::ConstPtr& msg, int id )
 {
 	ft_time[id] = msg->header.stamp.toSec();
-	fx[id] = msg->wrench.force.x - offset_fx[id];
-	fy[id] = msg->wrench.force.y - offset_fy[id];
-	fz[id] = msg->wrench.force.z - offset_fz[id];
-	tx[id] = msg->wrench.torque.x - offset_tx[id];
-	ty[id] = msg->wrench.torque.y - offset_ty[id];
-	tz[id] = msg->wrench.torque.z - offset_tz[id];
+	fx[id] = msg->wrench.force.y - offset_fy[id];
+	fy[id] = msg->wrench.force.x - offset_fx[id];
+	fz[id] = -msg->wrench.force.z + offset_fz[id];
+	tx[id] = msg->wrench.torque.y - offset_ty[id];
+	ty[id] = msg->wrench.torque.x - offset_tx[id];
+	tz[id] = -msg->wrench.torque.z + offset_tz[id];
 
 	ft_dirty[id] = true;
 }
