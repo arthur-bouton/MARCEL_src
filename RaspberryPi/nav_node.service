@@ -1,0 +1,14 @@
+# To be put in /etc/systemd/system/
+# Register the service for starting at boot:
+# $ sudo systemctl enable nav_node.service
+
+[Unit]
+Description=Start ROS navigation node for the rover
+
+[Service]
+ExecStart=/bin/bash -c 'source /opt/ros/kinetic/setup.bash && \
+						source /home/ubuntu/catkin_ws/devel/setup.bash && \
+                        rosrun rover_ctrl nav_node'
+
+[Install]
+WantedBy=multi-user.target
