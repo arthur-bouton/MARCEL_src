@@ -10,6 +10,10 @@ import locale
 locale.setlocale( locale.LC_ALL, '' )
 
 
+steer_max = 15.
+torque_max = 20.
+
+
 class Print_manager() :
 
 	def __init__( self, scr, top_gap ) :
@@ -30,8 +34,38 @@ class Print_manager() :
 			scr.addstr( self._current_line, 0, '_'*( w - 1 ), curses.A_DIM )
 
 
-def callback_info( msg ):
+def callback_nav_info( msg ):
 	msg_lines.new_msg( msg.data )
+
+
+def print_bar( scr, line, value, value_max, right_space=0 ) :
+
+	h, w = scr.getmaxyx()
+	l_half_gauge = int( w - right_space )/2
+	l_bar = min( abs( int( value/value_max*l_half_gauge ) ), l_half_gauge )
+
+	pieces = []
+	pieces.append( ' '*l_half_gauge )
+	pieces.append( '|' )
+	pieces.append( '█'*l_bar )
+	pieces.append( ' '*( l_half_gauge - l_bar ) )
+
+	if value < 0 :
+		pieces.reverse()
+
+	scr.move( line, 0 )
+	for piece in pieces :
+		scr.addstr( piece )
+
+
+def callback_cmd_info( msg ):
+	print_bar( stdscr, 3, msg.steer, steer_max, 22 )
+	stdscr.addstr( '| Steering: %+5.1f°' % steer )
+
+	print_bar( stdscr, 4, msg.torque, torque_max, 22 )
+	stdscr.addstr( '| Torque:   %+5.1f N.m' % torque )
+
+	stdscr.refresh()
 
 
 try :
@@ -42,11 +76,12 @@ try :
 	curses.cbreak()
 	curses.curs_set( False )
 
-	msg_lines = Print_manager( stdscr, 3 )
+	msg_lines = Print_manager( stdscr, 5 )
 
-	pub = rospy.Publisher( 'nav_ctrl', Rov_ctrl, queue_size=1 )
-	rospy.init_node( 'keyboard_ctrl' )
-	sub_info = rospy.Subscriber( 'nav_info_string', String, callback_info )
+	pub = rospy.Publisher( 'cmd_ctrl', Rov_ctrl, queue_size=1 )
+	rospy.init_node( 'keyboard_cmd' )
+	sub_cmd_info = rospy.Subscriber( 'nav_ctrl', String, callback_cmd_info )
+	sub_nav_info = rospy.Subscriber( 'nav_info_string', String, callback_nav_info )
 
 	repeat_period = rospy.get_param( '~repeat_period', 500 )
 	if repeat_period > 0 :
@@ -55,25 +90,20 @@ try :
 
 	cmd = Rov_ctrl()
 
-	cmd.rate_mode = False
 	cmd.engaged = False
 
 	speed = 0.0
 	speed_inc = 5
 
-	angle = 0.0
-	angle_inc = 1
-	angle_limit = 40
-
-	torque = 0.0
-	torque_inc = 1
-
-	crawling_mode = False
+	cmd.steer = 0.0
+	cmd.torque = 0.0
+	cmd.rate_mode = False
+	cmd.crawling_mode = False
 
 	paused = False
 
 
-	stdscr.addstr( 0, 0, '[ Engage: SPACE | Speed: UP/DOWN/! | Angle: LEFT/RIGHT/: | Torque: PAGE_UP/PAGE_DOWN/* | CM: ; | Pause/Publish: p ]', curses.A_DIM )
+	stdscr.addstr( 0, 0, '[ Engage: SPACE | Speed: UP/DOWN/! | Pause/Publish: p ]', curses.A_DIM )
 
 	while not rospy.is_shutdown() :
 
@@ -87,10 +117,7 @@ try :
 		else :
 			stdscr.addstr( 'disengaged', curses.A_DIM )
 
-		stdscr.addstr( ' | Speed: %+.1f mm/s | Angle: %+.f° | Torque: %+.1f N.m' % ( speed, angle, torque ) )
-
-		if crawling_mode :
-			stdscr.addstr( ' [crawling mode]' )
+		stdscr.addstr( ' | Speed: %+.1f mm/s' % speed )
 
 		if paused :
 			stdscr.addstr( ' [paused]', curses.A_BOLD )
@@ -113,27 +140,6 @@ try :
 		elif c == '!' :
 			speed = 0
 
-		elif c == 'KEY_LEFT' :
-			angle -= angle_inc
-			if angle < -angle_limit :
-				angle = -angle_limit
-		elif c == 'KEY_RIGHT' :
-			angle += angle_inc
-			if angle > angle_limit :
-				angle = angle_limit
-		elif c == ':' :
-			angle = 0
-
-		elif c == 'KEY_PPAGE' :
-			torque += torque_inc
-		elif c == 'KEY_NPAGE' :
-			torque -= torque_inc
-		elif c == '*' :
-			torque = 0
-
-		elif c == ';' :
-			crawling_mode = not crawling_mode
-
 		elif c == 'p' :
 			paused = not paused
 
@@ -145,9 +151,6 @@ try :
 
 		if c != 'None' and not paused :
 			cmd.speed = speed
-			cmd.steer = angle
-			cmd.torque = torque
-			cmd.crawling_mode = crawling_mode
 
 		if repeat_period <= 0 and ( paused or not cmd.engaged ) and c != ' ' :
 			continue

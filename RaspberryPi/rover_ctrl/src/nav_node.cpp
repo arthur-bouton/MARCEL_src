@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <ros/ros.h>
 #include "rover_ctrl/Rov_ctrl.h"
+#include "rover_ctrl/Joints_info.h"
 #include "std_msgs/String.h"
 #include <sstream>
 #include "filters2.hh"
@@ -64,7 +65,7 @@
 #define HDR_SEA_ANGLE_TOR 0x5A
 
 #define MC_TIMEOUT 1. // s
-#define CMD_NAV_TIMEOUT 1. // s
+#define NAV_CTRL_TIMEOUT 1. // s
 
 
 #define DEG_TO_RAD 1.7453292519943295e-2
@@ -79,7 +80,7 @@
 #define LOOP_FREQ 50 // Hz
 
 
-ros::Publisher info_ctrl_pub;
+ros::Publisher nav_info_string_pub;
 
 
 void init_rt()
@@ -293,7 +294,7 @@ void read_from_wmc( const int F_fd, const int B_fd )
 				// Send the message on the str_info topic:
 				std_msgs::String msg;
 				msg.data = std::string( ros_info_buf );
-				info_ctrl_pub.publish( msg );
+				nav_info_string_pub.publish( msg );
 
 				rd = rd_pos[i] + rd - j - 1;
 				memmove( buffer[i], buffer[i] + j + 1, rd );
@@ -413,10 +414,11 @@ void stop_procedure( int sig )
 
 bool engaged_cmd = false;
 float speed_cmd = 0;
-float angle_cmd = 0;
+float steer_cmd = 0;
 float torque_cmd = 0;
+bool rate_mode_cmd = false;
 bool crawling_mode_cmd = false;
-ros::Time last_update_cmd_nav;
+ros::Time last_update_nav_ctrl;
 
 
 void cmd_rcv_Callback( const rover_ctrl::Rov_ctrl::ConstPtr& msg )
@@ -432,14 +434,15 @@ void cmd_rcv_Callback( const rover_ctrl::Rov_ctrl::ConstPtr& msg )
 	}
 	engaged_cmd = msg->engaged;
 	speed_cmd = msg->speed;
-	angle_cmd = msg->angle;
+	steer_cmd = msg->steer;
 	torque_cmd = msg->torque;
+	rate_mode_cmd = msg->rate_mode;
 	crawling_mode_cmd = msg->crawling_mode;
 
-	last_update_cmd_nav = msg->header.stamp;
+	last_update_nav_ctrl = msg->header.stamp;
 
 	ROS_INFO( "New command received: [ %s %f %f %f %s ]", ( engaged_cmd ? "true" : "false" ),
-	          speed_cmd, angle_cmd, torque_cmd, ( crawling_mode_cmd ? "true" : "false" ) );
+	          speed_cmd, steer_cmd, torque_cmd, ( crawling_mode_cmd ? "true" : "false" ) );
 }
 
 
@@ -476,10 +479,12 @@ int main( int argc, char **argv )
 	if ( ! open_and_identify_wmc( wmc_devices, wmc_baudrate, wmc_F_fd, wmc_B_fd ) )
 		return -1;
 
-	ros::Subscriber sub = nh.subscribe( "cmd_nav", 1, cmd_rcv_Callback );
+	ros::Subscriber nav_ctrl_sub = nh.subscribe( "nav_ctrl", 1, cmd_rcv_Callback );
 
-	info_ctrl_pub = nh.advertise<std_msgs::String>( "ctrl_info", 50 );
-	std_msgs::String msg;
+	nav_info_string_pub = nh.advertise<std_msgs::String>( "nav_info_string", 50 );
+
+	ros::Publisher joints_info_pub = nh.advertise<rover_ctrl::Joints_info>( "joints_info", 10 );
+	rover_ctrl::Joints_info joints_info_msg;
 
 
 	// Modification of MC control gains:
@@ -518,8 +523,8 @@ int main( int argc, char **argv )
 	ros::Duration mc_timeout( MC_TIMEOUT );
 	ros::Time last_update_from_mc = ros::Time::now();
 
-	ros::Duration cmd_nav_timeout( CMD_NAV_TIMEOUT );
-	bool cmd_nav_connected = false;
+	ros::Duration nav_ctrl_timeout( NAV_CTRL_TIMEOUT );
+	bool nav_ctrl_connected = false;
 
 	//ros::Time current_time;
 	//ros::Time last_time = ros::Time::now();
@@ -532,18 +537,18 @@ int main( int argc, char **argv )
 		speed_cmd_filter.update();
 
 		// Check the reception of navigation commands:
-		bool disconnection = sub.getNumPublishers() == 0 || ros::Time::now() - last_update_cmd_nav >= cmd_nav_timeout;
-		if ( cmd_nav_connected && disconnection )
+		bool disconnection = nav_ctrl_sub.getNumPublishers() == 0 || ros::Time::now() - last_update_nav_ctrl >= nav_ctrl_timeout;
+		if ( nav_ctrl_connected && disconnection )
 		{
 			if ( engaged_cmd )
 				disengage_all();
-			cmd_nav_connected = false;
+			nav_ctrl_connected = false;
 		}
-		else if ( ! cmd_nav_connected && ! disconnection )
+		else if ( ! nav_ctrl_connected && ! disconnection )
 		{
 			if ( engaged_cmd )
 				send_cmd1( mc_fd, CMD_ENGAGE, 0 );
-			cmd_nav_connected = true;
+			nav_ctrl_connected = true;
 		}
 
 		// Check the communication with MC:
@@ -602,13 +607,15 @@ int main( int argc, char **argv )
 
 
 		// Send the commands:
-		if ( engaged_cmd && cmd_nav_connected )
+		if ( engaged_cmd && nav_ctrl_connected )
 		{
 			send_cmd2( wmc_F_fd, CMD_VEL, w_cmd[0], w_cmd[1] );
 			send_cmd2( wmc_B_fd, CMD_VEL, w_cmd[2], w_cmd[3] );
 
-			send_cmd1( mc_fd, CMD_MOTOR_1_POS, angle_cmd );
-			//send_cmd1( mc_fd, CMD_MOTOR_1_VEL, angle_cmd );
+			if ( rate_mode_cmd )
+				send_cmd1( mc_fd, CMD_MOTOR_1_VEL, steer_cmd );
+			else
+				send_cmd1( mc_fd, CMD_MOTOR_1_POS, steer_cmd );
 
 			//send_cmd1( mc_fd, CMD_MOTOR_2_POS, torque_cmd );
 			send_cmd1( mc_fd, CMD_MOTOR_2_TOR, torque_cmd );
@@ -616,6 +623,14 @@ int main( int argc, char **argv )
 
 		//printf( "angle_A: %f | vel_A: %f | boggie_angle: %f | boggie_torque: %f | loop duration: %f\n", cj_angle, cj_rate, sea_angle, sea_torque, dt );
 		//printf( "%f %f %f %f\n", w_cmd[0], w_cmd[1], w_cmd[2], w_cmd[3] );
+
+		// Publish internal joints' information:
+		joints_info_msg.cj_angle = cj_angle;
+		joints_info_msg.cj_rate = cj_rate;
+		joints_info_msg.sea_angle = sea_angle;
+		joints_info_msg.sea_torque = sea_torque;
+		joints_info_msg.header.stamp = ros::Time::now();
+		joints_info_pub.publish( joints_info_msg );
 
 		read_from_wmc( wmc_F_fd, wmc_B_fd );
 

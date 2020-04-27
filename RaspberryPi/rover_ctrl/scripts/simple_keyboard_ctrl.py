@@ -15,7 +15,7 @@ try :
 	curses.cbreak()
 	curses.curs_set( False )
 
-	pub = rospy.Publisher( 'cmd_nav', Rov_ctrl, queue_size=1 )
+	pub = rospy.Publisher( 'nav_ctrl', Rov_ctrl, queue_size=1 )
 	rospy.init_node( 'keyboard_ctrl' )
 
 	while not rospy.is_shutdown() :
@@ -42,7 +42,7 @@ try :
 
 			if not pause :
 				cmd.speed = speed
-				cmd.angle = angle
+				cmd.rate = angle
 				cmd.torque = torque
 				cmd.crawling_mode = crawling_mode
 
