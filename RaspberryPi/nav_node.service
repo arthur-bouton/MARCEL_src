@@ -3,7 +3,7 @@
 # $ sudo systemctl enable nav_node.service
 
 [Unit]
-Description=Start ROS navigation node for the rover
+Description=Start the ROS low-level control node for the rover
 
 [Service]
 ExecStart=/bin/bash -c 'source /opt/ros/kinetic/setup.bash && \
