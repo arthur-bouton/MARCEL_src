@@ -1,9 +1,13 @@
-# MARCEL_src
+# Source code for MARCEL
+
+<p align="center">
+	<img src="cover_picture.png?raw=true" width="600">
+</p>
+
 
 Source code for MARCEL (Mobile Active Rover Chassis for Enhanced Locomotion)
 
-
-**Build the ROS package on the rover:**
+### Build the ROS package on the rover:
 
 Let's say your catkin workspace is *~/catkin_ws* for example:<br />
 `CATKIN_WS=~/catkin_ws`
@@ -25,8 +29,14 @@ To autonomously start the low-level control node (nav_node) at boot:<br />
 `sudo systemctl enable nav_node.service`
 
 
-**Nodes for the operator's remote computer:**
+### Install nodes for the operator's remote computer:
 
 To operate the rover from a remote computer, you only need the nodes in python:<br />
 `mkdir -p $CATKIN_WS/src/rover_ctrl`<br />
 `ln -s $(readlink -f MARCEL_src/RaspberryPi/rover_ctrl/scripts) $CATKIN_WS/src/rover_ctrl`
+
+
+### Control the rover from a remote computer:
+
+For a manual driving, start the ROS node *keyboard_ctrl* which publishes on *nav_ctrl* topic:<br />
+`rosrun rover_ctrl keyboard_ctrl.py`
