@@ -1,0 +1,3 @@
+[submodule "RaspberryPi/rover_ctrl/src/ModelTree"]
+	path = RaspberryPi/rover_ctrl/src/ModelTree
+	url = https://github.com/Bouty92/ModelTree

@@ -126,7 +126,7 @@ int open_uart( const char *device_name, speed_t baudrate )
 	// Get the current options for the port
 	tcgetattr( fd, &options );
 
-	// Set the baud rates to 921600
+	// Set the baud rate
 	cfsetispeed( &options, baudrate );
 	cfsetospeed( &options, baudrate );
 
