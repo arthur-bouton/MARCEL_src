@@ -3,32 +3,20 @@
 #include <unistd.h>
 #include <errno.h>
 #include <math.h>
+#include <functional> // std::bind
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
 #include "geometry_msgs/WrenchStamped.h"
+
 #include "robotiq_ft_sensor/sensor_accessor.h" // from https://github.com/ros-industrial/robotiq.git
-#include <functional>   // std::bind
-
-#include <linux/spi/spidev.h>
-#include <sys/ioctl.h>
-#include "gpio_access.h"
-
-#include "ModelTree/cpp/model_tree.hh" // git clone https://github.com/Bouty92/ModelTree
-
 #include "rover_ctrl/Joints_info.h"
 #include "rover_ctrl/Rov_ctrl.h"
+
+#include "ModelTree/cpp/model_tree.hh" // git clone https://github.com/Bouty92/ModelTree
 
 
 #define LMT_YAML_FILE_PATH_1 "~/Desktop/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_1.yaml"
 #define LMT_YAML_FILE_PATH_2 "~/Desktop/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_2.yaml"
-
-
-#define INC_CSB 22
-#define INC_RDAX 0x10
-#define INC_RDAY 0x11
-
-#define INC_OFFSET_X 0.8 // °
-#define INC_OFFSET_Y 2.0 // °
 
 
 #define FT_SERIAL_NUMBER_FRONT "  F-31951"
@@ -48,6 +36,25 @@ const float offset_tz[2] = { -0.699, -0.497 };
 #define LOOP_FREQ 2 // Hz
 
 #define CMD_CTRL_TIMEOUT 1. // s
+
+//#define USE_ONBOARD_INCLINOMETER
+
+
+//===============================================================//
+//------------------------------SPI------------------------------//
+//===============================================================//
+
+#include <linux/spi/spidev.h>
+#include <sys/ioctl.h>
+#include "gpio_access.h"
+
+
+#define INC_CSB 22
+#define INC_RDAX 0x10
+#define INC_RDAY 0x11
+
+#define INC_OFFSET_X 0.8 // °
+#define INC_OFFSET_Y 2.0 // °
 
 
 int setup_spi( std::vector<unsigned int> csb_list, const char* device="/dev/spidev0.0" )
@@ -123,6 +130,172 @@ int16_t read_spi( int fd, unsigned int csb, unsigned char cmd )
 
 	return acc;
 }
+
+
+void get_inclinaisons( const int fd, float& angle_x, float& angle_y )
+{
+	// Get the accelerations from the inclinometer:
+	int16_t acc_x = read_spi( fd, INC_CSB, INC_RDAX );
+	usleep( 150 );
+	int16_t acc_y = read_spi( fd, INC_CSB, INC_RDAY );
+
+	// Convert the accelerations into tilt angles:
+	angle_x = -asin( acc_y/819. )*RAD_TO_DEG - INC_OFFSET_X;
+	angle_y = -asin( acc_x/819. )*RAD_TO_DEG - INC_OFFSET_Y;
+}
+
+
+//================================================================//
+//------------------------------UART------------------------------//
+//================================================================//
+
+#include <fcntl.h>
+#include <termios.h>
+
+
+#define COMPASS_DEVICE "/dev/ttyUSB0"
+#define COMPASS_BAUDRATE B9600
+#define COMPASS_GET_BEARING_16_BIT 0x13
+#define COMPASS_GET_ALL 0x23
+#define COMPASS_GET_PITCH 0x14
+#define COMPASS_GET_ROLL 0x15
+
+
+int open_uart( const char *device_name, speed_t baudrate )
+{
+	struct termios options;
+	int fd;
+	 
+	fd = open( device_name, O_RDWR | O_NOCTTY | O_NDELAY );
+
+	if ( fd == -1 )
+	{
+		fprintf( stderr, "Can't open the port %s: %s\n", device_name, strerror( errno ) );
+		return -1;
+	}
+
+	fcntl( fd, F_SETFL, 0 );
+
+	// Get the current options for the port:
+	tcgetattr( fd, &options );
+
+	// Set the baud rate:
+	cfsetispeed( &options, baudrate );
+	cfsetospeed( &options, baudrate );
+
+	// 8 bits, no parity, 2 stop bits:
+	options.c_cflag &= ~PARENB;
+	//options.c_cflag &= ~CSTOPB; // 1 stop bit
+	options.c_cflag |= CSTOPB; // 2 stop bits
+	options.c_cflag &= ~CSIZE;
+	options.c_cflag |= CS8;
+
+	// Enable the receiver and set local mode:
+	options.c_cflag |= ( CLOCAL | CREAD );
+
+	// RAW mode:
+	options.c_lflag &= ~( ICANON | ECHO | ECHOE | ISIG );
+	options.c_oflag &= ~OPOST;
+	options.c_iflag &= ~( IXON | IXOFF );
+	options.c_iflag &= IGNCR;
+
+	// Set the new options for the port:
+	tcsetattr( fd, TCSANOW, &options );
+
+	return fd;
+}
+
+
+bool compass_get_bearing( const int fd, float& angle )
+{
+	uint8_t cmd = COMPASS_GET_BEARING_16_BIT;
+
+	if ( write( fd, &cmd, 1 ) != 1 )
+	{
+		fprintf( stderr, "Failed to request the bearing from the compass: %s\n", strerror( errno ) );
+		return false;
+	}
+
+	uint16_t bearing;
+
+	if ( read( fd, &bearing, 2 ) != 2 )
+	{
+		fprintf( stderr, "Failed to receive the bearing from the compass: %s\n", strerror( errno ) );
+		return false;
+	}
+
+	// High byte first:
+	bearing = ( bearing >> 8 ) | ( ( bearing & 0xFF ) << 8 );
+
+	if ( bearing > 3599 )
+	{
+		fprintf( stderr, "Wrong bearing value received from the compass: %i\n", bearing );
+		return false;
+	}
+
+	angle = bearing*0.1;
+
+	return true;
+}
+
+
+bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
+{
+	uint8_t cmd = COMPASS_GET_ALL;
+
+	if ( write( fd, &cmd, 1 ) != 1 )
+	{
+		fprintf( stderr, "Failed to request the data from the compass: %s\n", strerror( errno ) );
+		return false;
+	}
+
+	struct {
+	//struct __attribute__((__packed__)) {
+		uint16_t bearing;
+		int8_t pitch;
+		int8_t roll;
+	} data;
+
+	if ( read( fd, &data, 4 ) != 4 )
+	{
+		fprintf( stderr, "Failed to receive the data from the compass: %s\n", strerror( errno ) );
+		return false;
+	}
+
+	// High byte first:
+	data.bearing = ( data.bearing >> 8 ) | ( ( data.bearing & 0xFF ) << 8 );
+
+	bool data_all_valid = true;
+
+	if ( data.bearing > 3599 )
+	{
+		fprintf( stderr, "Wrong bearing value received from the compass: %i\n", data.bearing );
+		data_all_valid = false;
+	}
+	else
+		bearing = data.bearing*0.1;
+
+	if ( data.pitch > 90 || data.pitch < -90 )
+	{
+		fprintf( stderr, "Wrong pitch value received from the compass: %i\n", data.pitch );
+		data_all_valid = false;
+	}
+	else
+		pitch = data.pitch;
+
+	if ( data.roll > 90 || data.roll < -90 )
+	{
+		fprintf( stderr, "Wrong roll value received from the compass: %i\n", data.roll );
+		data_all_valid = false;
+	}
+	else
+		roll = data.roll;
+
+	return data_all_valid;
+}
+
+//----------------------------------------------------------------//
+//================================================================//
 
 
 double ft_time[2] = { 0 };
@@ -249,27 +422,33 @@ int main( int argc, char **argv )
 	cmd_ctrl_spinner.start();
 
 
-	float direction_angle = 0;
+	int compass_fd = open_uart( COMPASS_DEVICE, COMPASS_BAUDRATE );
+	float direction_angle, initial_direction;
+	bool compass_dirty = compass_get_bearing( compass_fd, initial_direction );
 
 
+#ifdef USE_ONBOARD_INCLINOMETER
 	int inc_fd = setup_spi( std::vector<unsigned int>{ INC_CSB } );
 	usleep( 500 );
-	int16_t acc_x, acc_y;
 	float angle_x, angle_y;
+#else
+	short angle_x, angle_y;
+#endif
 
 
 	ros::Duration cmd_ctrl_timeout( CMD_CTRL_TIMEOUT );
 
 	while ( ros::ok() )
 	{
-		// Get the accelerations from the inclinometer:
-		acc_x = read_spi( inc_fd, INC_CSB, INC_RDAX );
-		usleep( 150 );
-		acc_y = read_spi( inc_fd, INC_CSB, INC_RDAY );
+#ifdef USE_ONBOARD_INCLINOMETER
+		get_inclinaisons( inc_fd, angle_x, angle_y );
+		compass_get_bearing( compass_fd, direction_angle );
+#else
+		compass_get_all( compass_fd, direction_angle, angle_x, angle_y );
+#endif
 
-		// Convert the accelerations into tilt angles:
-		angle_x = -asin( acc_y/819. )*RAD_TO_DEG - INC_OFFSET_X;
-		angle_y = -asin( acc_x/819. )*RAD_TO_DEG - INC_OFFSET_Y;
+		// Realign the heading direction in relation to the initial angle:
+		direction_angle -= initial_direction;
 
 
 		// Retrieve latest wrenches and joint angles:

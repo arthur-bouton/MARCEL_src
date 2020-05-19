@@ -117,35 +117,35 @@ int open_uart( const char *device_name, speed_t baudrate )
 
 	if ( fd == -1 )
 	{
-		fprintf( stderr, "Can't open port %s: %s\n", device_name, strerror( errno ) );
+		fprintf( stderr, "Can't open the port %s: %s\n", device_name, strerror( errno ) );
 		return -1;
 	}
 
 	fcntl( fd, F_SETFL, 0 );
 
-	// Get the current options for the port
+	// Get the current options for the port:
 	tcgetattr( fd, &options );
 
-	// Set the baud rate
+	// Set the baud rate:
 	cfsetispeed( &options, baudrate );
 	cfsetospeed( &options, baudrate );
 
-	// 8 Bit, No Parity, 1 Stop Bit
+	// 8 bits, no parity, 1 stop bit:
 	options.c_cflag &= ~PARENB;
-	options.c_cflag &= ~CSTOPB;
+	options.c_cflag &= ~CSTOPB; // 1 stop bit
 	options.c_cflag &= ~CSIZE;
 	options.c_cflag |= CS8;
 
-	//Enable the receiver and set local mode
+	// Enable the receiver and set local mode:
 	options.c_cflag |= ( CLOCAL | CREAD );
 
-	// RAW mode
+	// RAW mode:
 	options.c_lflag &= ~( ICANON | ECHO | ECHOE | ISIG );
 	options.c_oflag &= ~OPOST;
 	options.c_iflag &= ~( IXON | IXOFF );
 	options.c_iflag &= IGNCR;
 
-	// Set the new options for the port
+	// Set the new options for the port:
 	tcsetattr( fd, TCSANOW, &options );
 
 	return fd;
