@@ -14,7 +14,7 @@
 #include "rover_ctrl/Joints_info.h"
 #include "std_msgs/String.h"
 #include <sstream>
-#include "filters2.hh"
+#include "Filters/cpp/filters2.hh"
 
 
 #define PRIORITY 49

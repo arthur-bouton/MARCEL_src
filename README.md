@@ -7,7 +7,8 @@
 
 Source code for MARCEL (Mobile Active Rover Chassis for Enhanced Locomotion)
 
-This repository contains a dependency on the repository ![github.com/Bouty92/ModelTree](https://github.com/Bouty92/ModelTree) for the compilation of the ROS node *cmd_mt*. It will be automatically downloaded as well if you clone the present repository with `git clone --recursive`. However, if you have already cloned it without this option, you can resolve the dependency by running in the root directory *MARCEL_src*:<br />
+This repository contains a dependency on the repository ![github.com/Bouty92/Filters](https://github.com/Bouty92/Filters) for the compilation of the ROS node *nav_node* and on the repository ![github.com/Bouty92/ModelTree](https://github.com/Bouty92/ModelTree) for the compilation of the ROS node *cmd_mt*.<br />
+It will be automatically downloaded as well if you clone the present repository with `git clone --recursive`. However, if you have already cloned it without this option, you can resolve the dependency by running in the root directory *MARCEL_src*:<br />
 `$ git submodule update --init`
 
 
