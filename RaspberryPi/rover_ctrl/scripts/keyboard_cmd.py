@@ -60,10 +60,10 @@ def print_bar( scr, line, value, value_max, right_space=0 ) :
 
 def callback_cmd_info( msg ):
 	print_bar( stdscr, 3, msg.steer, steer_max, 22 )
-	stdscr.addstr( '| Steering: %+5.1f°' % steer )
+	stdscr.addstr( '| Steering: %+5.1f°' % msg.steer )
 
 	print_bar( stdscr, 4, msg.torque, torque_max, 22 )
-	stdscr.addstr( '| Torque:   %+5.1f N.m' % torque )
+	stdscr.addstr( '| Torque:   %+5.1f N.m' % msg.torque )
 
 	stdscr.refresh()
 
@@ -80,7 +80,7 @@ try :
 
 	pub = rospy.Publisher( 'cmd_ctrl', Rov_ctrl, queue_size=1 )
 	rospy.init_node( 'keyboard_cmd' )
-	sub_cmd_info = rospy.Subscriber( 'nav_ctrl', String, callback_cmd_info )
+	sub_cmd_info = rospy.Subscriber( 'nav_ctrl', Rov_ctrl, callback_cmd_info )
 	sub_nav_info = rospy.Subscriber( 'nav_info_string', String, callback_nav_info )
 
 	repeat_period = rospy.get_param( '~repeat_period', 500 )

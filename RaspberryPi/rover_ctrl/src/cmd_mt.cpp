@@ -15,8 +15,8 @@
 #include "ModelTree/cpp/model_tree.hh" // git clone https://github.com/Bouty92/ModelTree
 
 
-#define LMT_YAML_FILE_PATH_1 "~/Desktop/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_1.yaml"
-#define LMT_YAML_FILE_PATH_2 "~/Desktop/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_2.yaml"
+#define LMT_YAML_FILE_PATH_1 "/home/ubuntu/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_1.yaml"
+#define LMT_YAML_FILE_PATH_2 "/home/ubuntu/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_2.yaml"
 
 
 #define FT_SERIAL_NUMBER_FRONT "  F-31951"
@@ -37,7 +37,7 @@ const float offset_tz[2] = { -0.699, -0.497 };
 
 #define CMD_CTRL_TIMEOUT 1. // s
 
-//#define USE_ONBOARD_INCLINOMETER
+#define USE_ONBOARD_INCLINOMETER
 
 
 //===============================================================//

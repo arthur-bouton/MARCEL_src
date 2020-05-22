@@ -1,11 +1,11 @@
 <launch>
 	<node name="ft_sensor_0" pkg="robotiq_ft_sensor" type="rq_sensor">
-		<param name="serial_id" value="ttyUSB0"/>
+		<param name="serial_id" value="ttyUSB1"/>
 		<remap from="robotiq_ft_sensor_acc" to="ft_request_0"/>
 		<remap from="robotiq_ft_wrench" to="ft_wrench_0"/>
 	</node>
 	<node name="ft_sensor_1" pkg="robotiq_ft_sensor" type="rq_sensor">
-		<param name="serial_id" value="ttyUSB1"/>
+		<param name="serial_id" value="ttyUSB2"/>
 		<remap from="robotiq_ft_sensor_acc" to="ft_request_1"/>
 		<remap from="robotiq_ft_wrench" to="ft_wrench_1"/>
 	</node>
