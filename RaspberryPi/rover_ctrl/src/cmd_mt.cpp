@@ -425,6 +425,8 @@ int main( int argc, char **argv )
 	int compass_fd = open_uart( COMPASS_DEVICE, COMPASS_BAUDRATE );
 	float direction_angle, initial_direction;
 	bool compass_dirty = compass_get_bearing( compass_fd, initial_direction );
+	float prev_direction = initial_direction;
+	float prev_cache_direction = initial_direction;
 
 
 #ifdef USE_ONBOARD_INCLINOMETER
@@ -449,6 +451,19 @@ int main( int argc, char **argv )
 
 		// Realign the heading direction in relation to the initial angle:
 		direction_angle -= initial_direction;
+
+		// Filter inconsistent values:
+		if ( fabs( direction_angle - prev_cache_direction ) > 10 )
+		{
+			ROS_ERROR( "Inconsistent jump detected in the heading direction: from %f to %f°", prev_cache_direction, direction_angle );
+			prev_cache_direction = direction_angle;
+			direction_angle = prev_direction;
+		}
+		else
+		{
+			prev_direction = direction_angle;
+			prev_cache_direction = direction_angle;
+		}
 
 
 		// Retrieve latest wrenches and joint angles:
