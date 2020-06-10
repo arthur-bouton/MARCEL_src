@@ -503,6 +503,13 @@ int main( int argc, char **argv )
 			nav_ctrl_msg.torque = boggie_torque;
 			nav_ctrl_msg.header.stamp = ros::Time::now();
 			nav_ctrl_pub.publish( nav_ctrl_msg );
+
+			// Output the state and actions:
+			printf( "%f ", ros::Time::now().toSec() );
+			for ( auto val : state )
+				printf( "%f ", val );
+			printf( "%i %i %i %f %f\n", flip_coeff, node_1, node_2, steering_rate, boggie_torque );
+			fflush( stdout );
 		}
 
 
