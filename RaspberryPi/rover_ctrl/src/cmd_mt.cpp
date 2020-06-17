@@ -39,6 +39,9 @@ const float offset_tz[2] = { -0.699, -0.497 };
 
 #define USE_ONBOARD_INCLINOMETER
 
+#define STEERING_MAX_VEL 15 // °/s
+#define BOGGIE_MAX_TORQUE 20 // N.m
+
 
 //===============================================================//
 //------------------------------SPI------------------------------//
@@ -493,6 +496,10 @@ int main( int argc, char **argv )
 			// Infer the controls to apply:
 			float steering_rate = flip_coeff*lmt_1.predict( state, node_1 );
 			float boggie_torque = flip_coeff*lmt_2.predict( state, node_2 );
+
+			// Clip the control values:
+			steering_rate = std::min( std::max( -STEERING_MAX_VEL, steering_rate ), STEERING_MAX_VEL );
+			boggie_torque = std::min( std::max( -BOGGIE_MAX_TORQUE, boggie_torque ), BOGGIE_MAX_TORQUE );
 
 			// Check the connection with the operator's node:
 			if ( sub_c.getNumPublishers() == 0 || ros::Time::now() - last_update_cmd_ctrl >= cmd_ctrl_timeout )
