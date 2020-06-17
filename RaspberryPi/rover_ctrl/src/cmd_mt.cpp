@@ -440,6 +440,9 @@ int main( int argc, char **argv )
 	short angle_x, angle_y;
 #endif
 
+	float steering_rate;
+	float boggie_torque;
+
 
 	ros::Duration cmd_ctrl_timeout( CMD_CTRL_TIMEOUT );
 
@@ -494,8 +497,14 @@ int main( int argc, char **argv )
 			}
 
 			// Infer the controls to apply:
-			float steering_rate = flip_coeff*lmt_1.predict( state, node_1 );
-			float boggie_torque = flip_coeff*lmt_2.predict( state, node_2 );
+			if ( fabs( state[5] ) > 20 )
+				steering_rate = flip_coeff*lmt_1.predict( state, node_1 );
+			else
+			{
+				steering_rate = 0.5*state[0];
+				node_1 = 0;
+			}
+			boggie_torque = flip_coeff*lmt_2.predict( state, node_2 );
 
 			// Clip the control values:
 			steering_rate = std::min( std::max( -STEERING_MAX_VEL, steering_rate ), STEERING_MAX_VEL );
