@@ -22,9 +22,9 @@
 #define FT_SERIAL_NUMBER_FRONT "  F-31951"
 #define FT_SERIAL_NUMBER_REAR  "  F-31952"
 
-const float offset_fx[2] = { -25.72, 5.12 };
-const float offset_fy[2] = { -86.85, -165.43 };
-const float offset_fz[2] = { -49.03, -39.12 };
+const float offset_fx[2] = { -36.72, 5.12 };
+const float offset_fy[2] = { -191.85, -165.43 };
+const float offset_fz[2] = { -53.03, -39.12 };
 const float offset_tx[2] = { -1.739, -2.390 };
 const float offset_ty[2] = { 0.545, 0.516 };
 const float offset_tz[2] = { -0.699, -0.497 };
