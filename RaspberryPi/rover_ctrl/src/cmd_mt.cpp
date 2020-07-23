@@ -39,8 +39,8 @@ const float offset_tz[2] = { -0.699, -0.497 };
 
 #define USE_ONBOARD_INCLINOMETER
 
-#define STEERING_MAX_VEL 15 // °/s
-#define BOGGIE_MAX_TORQUE 20 // N.m
+#define STEERING_MAX_VEL  (float) 15 // °/s
+#define BOGGIE_MAX_TORQUE (float) 20 // N.m
 
 
 //===============================================================//
