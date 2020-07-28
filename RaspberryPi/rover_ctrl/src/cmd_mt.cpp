@@ -12,7 +12,7 @@
 #include "rover_ctrl/Joints_info.h"
 #include "rover_ctrl/Rov_ctrl.h"
 
-#include "ModelTree/cpp/model_tree.hh" // git clone https://github.com/Bouty92/ModelTree
+//#include "ModelTree/cpp/model_tree.hh" // git clone https://github.com/Bouty92/ModelTree
 
 
 #define LMT_YAML_FILE_PATH_1 "/home/ubuntu/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_1.yaml"
@@ -343,6 +343,8 @@ void cmd_ctrl_rcv_Callback( const rover_ctrl::Rov_ctrl::ConstPtr& msg )
 	nav_ctrl_msg.header.stamp = msg->header.stamp;
 	nav_ctrl_msg.engaged = msg->engaged;
 	nav_ctrl_msg.speed = msg->speed;
+	nav_ctrl_msg.steer = msg->steer;
+	nav_ctrl_msg.torque = msg->torque;
 	nav_ctrl_pub.publish( nav_ctrl_msg );
 
 	last_update_cmd_ctrl = msg->header.stamp;
@@ -369,10 +371,10 @@ int main( int argc, char **argv )
 
 
 	// Build a model tree for the steering rate and an other for the boggie torque:
-	Linear_model_tree<float> lmt_1( lmt_yaml_file_path[0], false );
-	Linear_model_tree<float> lmt_2( lmt_yaml_file_path[1], false );
-	int node_1 = 0;
-	int node_2 = 0;
+	//Linear_model_tree<float> lmt_1( lmt_yaml_file_path[0], false );
+	//Linear_model_tree<float> lmt_2( lmt_yaml_file_path[1], false );
+	//int node_1 = 0;
+	//int node_2 = 0;
 
 
 	// Identification of each FT sensor:
@@ -419,7 +421,7 @@ int main( int argc, char **argv )
 
 	// Give the processing of the operator's inputs its own thread so that controls are passed asynchronously to the nav_node:
 	ros::CallbackQueue cmd_ctrl_callback_queue;
-	ros::SubscribeOptions ops_c = ros::SubscribeOptions::create<rover_ctrl::Rov_ctrl>( "cmd_ctrl", 1, cmd_ctrl_rcv_Callback, ros::VoidPtr(), &cmd_ctrl_callback_queue );
+	ros::SubscribeOptions ops_c = ros::SubscribeOptions::create<rover_ctrl::Rov_ctrl>( "nav_ctrl", 1, cmd_ctrl_rcv_Callback, ros::VoidPtr(), &cmd_ctrl_callback_queue );
 	ros::Subscriber sub_c = nh.subscribe( ops_c );
 	ros::AsyncSpinner cmd_ctrl_spinner( 1, &cmd_ctrl_callback_queue );
 	cmd_ctrl_spinner.start();
@@ -446,6 +448,9 @@ int main( int argc, char **argv )
 
 	float steering_rate;
 	float boggie_torque;
+
+
+	long stable_torque_count = 0;
 
 
 	ros::Duration cmd_ctrl_timeout( CMD_CTRL_TIMEOUT );
@@ -496,53 +501,68 @@ int main( int argc, char **argv )
 		if ( ft_dirty[0] && ft_dirty[1] && joints_info_dirty )
 		{
 			// Flip or not the left and right to account for the robot's symmetry:
-			int flip_coeff = cj_angle < 0 ? -1 : 1;
+			//int flip_coeff = cj_angle < 0 ? -1 : 1;
 
 			// Build the current state:
-			std::vector<float> state;
-			state.push_back( flip_coeff*direction_angle );
-			state.push_back( flip_coeff*cj_angle );
-			state.push_back( flip_coeff*angle_x );
-			state.push_back( angle_y );
-			state.push_back( flip_coeff*sea_angle );
-			for ( int i = 0 ; i < 4 ; i++ )
-			{
-				if ( i == 2 )
-					continue;
-				for ( int j = 0 ; j < 3 ; j++ )
-					state.push_back( ( ( i + j )%2 == 0 ? 1 : flip_coeff )*ft_list[i][j] );
-			}
+			//std::vector<float> state;
+			//state.push_back( flip_coeff*direction_angle );
+			//state.push_back( flip_coeff*cj_angle );
+			//state.push_back( flip_coeff*angle_x );
+			//state.push_back( angle_y );
+			//state.push_back( flip_coeff*sea_angle );
+			//for ( int i = 0 ; i < 4 ; i++ )
+			//{
+				//if ( i == 2 )
+					//continue;
+				//for ( int j = 0 ; j < 3 ; j++ )
+					//state.push_back( ( ( i + j )%2 == 0 ? 1 : flip_coeff )*ft_list[i][j] );
+			//}
 
 			// Infer the controls to apply:
-			if ( fabs( state[5] ) > 20 )
-				steering_rate = flip_coeff*lmt_1.predict( state, node_1 );
-			else
-			{
-				steering_rate = 0.5*state[0];
-				node_1 = 0;
-			}
-			boggie_torque = flip_coeff*lmt_2.predict( state, node_2 );
+			//if ( fabs( state[5] ) > 20 )
+				//steering_rate = flip_coeff*lmt_1.predict( state, node_1 );
+			//else
+			//{
+				//steering_rate = 0.5*state[0];
+				//node_1 = 0;
+			//}
+			//boggie_torque = flip_coeff*lmt_2.predict( state, node_2 );
 
 			// Clip the control values:
-			steering_rate = std::min( std::max( -STEERING_MAX_VEL, steering_rate ), STEERING_MAX_VEL );
-			boggie_torque = std::min( std::max( -BOGGIE_MAX_TORQUE, boggie_torque ), BOGGIE_MAX_TORQUE );
+			//steering_rate = std::min( std::max( -STEERING_MAX_VEL, steering_rate ), STEERING_MAX_VEL );
+			//boggie_torque = std::min( std::max( -BOGGIE_MAX_TORQUE, boggie_torque ), BOGGIE_MAX_TORQUE );
 
 			// Check the connection with the operator's node:
-			if ( sub_c.getNumPublishers() == 0 || ros::Time::now() - last_update_cmd_ctrl >= cmd_ctrl_timeout )
-				nav_ctrl_msg.engaged = false;
+			//if ( sub_c.getNumPublishers() == 0 || ros::Time::now() - last_update_cmd_ctrl >= cmd_ctrl_timeout )
+				//nav_ctrl_msg.engaged = false;
 
 			// Publish the controls:
-			nav_ctrl_msg.steer = steering_rate;
-			nav_ctrl_msg.torque = boggie_torque;
-			nav_ctrl_msg.header.stamp = ros::Time::now();
-			nav_ctrl_pub.publish( nav_ctrl_msg );
+			//nav_ctrl_msg.steer = steering_rate;
+			//nav_ctrl_msg.torque = boggie_torque;
+			//nav_ctrl_msg.header.stamp = ros::Time::now();
+			//nav_ctrl_pub.publish( nav_ctrl_msg );
 
 			// Output the state and actions:
-			printf( "%f ", ros::Time::now().toSec() );
-			for ( auto val : state )
-				printf( "%f ", val );
-			printf( "%i %i %i %f %f\n", flip_coeff, node_1, node_2, steering_rate, boggie_torque );
-			fflush( stdout );
+			//printf( "%f ", ros::Time::now().toSec() );
+			//for ( auto val : state )
+				//printf( "%f ", val );
+			//printf( "%i %i %i %f %f\n", flip_coeff, node_1, node_2, steering_rate, boggie_torque );
+			//fflush( stdout );
+
+
+			if ( nav_ctrl_msg.torque == boggie_torque )
+			{
+				if ( stable_torque_count < 7 && ++stable_torque_count > 4 )
+				{
+					printf( "%f %f\n", boggie_torque, ft_list[3][0] );
+					fflush( stdout );
+				}
+			}
+			else
+			{
+				stable_torque_count = 0;
+				boggie_torque = nav_ctrl_msg.torque;
+			}
 		}
 
 
