@@ -401,8 +401,8 @@ int main( int argc, char **argv )
 		return -1;
 	}
 
-	ros::Subscriber sub_f = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_0", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[0] ) );
-	ros::Subscriber sub_r = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_1", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[1] ) );
+	ros::Subscriber sub_w0 = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_0", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[0] ) );
+	ros::Subscriber sub_w1 = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_1", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[1] ) );
 
 
 	ros::Subscriber sub_j = nh.subscribe<rover_ctrl::Joints_info>( "joints_info", 1, joints_info_rcv_Callback );
@@ -426,10 +426,14 @@ int main( int argc, char **argv )
 
 
 	int compass_fd = open_uart( COMPASS_DEVICE, COMPASS_BAUDRATE );
-	float direction_angle, initial_direction;
+	float direction_angle = 0;
+	float initial_direction = 0;
 	bool compass_dirty = compass_get_bearing( compass_fd, initial_direction );
-	float prev_direction = initial_direction;
-	float prev_cache_direction = initial_direction;
+	float prev_direction = 0;
+	float prev_measured_direction = 0;
+	const float jump_threshold = 10;
+	const int n_stability_checks = 3;
+	int n_current_check = 0;
 
 
 #ifdef USE_ONBOARD_INCLINOMETER
@@ -450,7 +454,7 @@ int main( int argc, char **argv )
 	{
 #ifdef USE_ONBOARD_INCLINOMETER
 		get_inclinaisons( inc_fd, angle_x, angle_y );
-		compass_get_bearing( compass_fd, direction_angle );
+		compass_dirty = compass_get_bearing( compass_fd, direction_angle );
 #else
 		compass_get_all( compass_fd, direction_angle, angle_x, angle_y );
 #endif
@@ -458,17 +462,30 @@ int main( int argc, char **argv )
 		// Realign the heading direction in relation to the initial angle:
 		direction_angle -= initial_direction;
 
-		// Filter inconsistent values:
-		if ( fabs( direction_angle - prev_cache_direction ) > 10 )
+		// Filter inconsistent bearing values:
+		if ( compass_dirty )
 		{
-			ROS_ERROR( "Inconsistent jump detected in the heading direction: from %f to %f°", prev_cache_direction, direction_angle );
-			prev_cache_direction = direction_angle;
-			direction_angle = prev_direction;
-		}
-		else
-		{
-			prev_direction = direction_angle;
-			prev_cache_direction = direction_angle;
+			if ( fabs( direction_angle - prev_direction ) <= jump_threshold )
+			{
+				prev_measured_direction = direction_angle;
+				prev_direction = direction_angle;
+				n_current_check = 0;
+			}
+			else if ( fabs( direction_angle - prev_measured_direction ) > jump_threshold )
+			{
+				ROS_ERROR( "Inconsistent jump detected in the heading direction: from %f to %f°", prev_measured_direction, direction_angle );
+				prev_measured_direction = direction_angle;
+				direction_angle = prev_direction;
+				n_current_check = n_stability_checks;
+			}
+			else
+			{
+				prev_measured_direction = direction_angle;
+				if ( --n_current_check > 0 )
+					direction_angle = prev_direction;
+				else
+					prev_direction = direction_angle;
+			}
 		}
 
 
