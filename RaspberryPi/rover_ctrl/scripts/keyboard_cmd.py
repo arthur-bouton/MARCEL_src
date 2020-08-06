@@ -17,21 +17,22 @@ torque_max = 20.
 class Print_manager() :
 
 	def __init__( self, scr, top_gap ) :
+		self._scr = scr
 		self._top_gap = top_gap
 		self._current_line = self._top_gap
 
 	def new_msg( self, msg ) :
-		h, w = scr.getmaxyx()
+		h, w = self._scr.getmaxyx()
 
-		scr.addnstr( self._current_line, 0, msg, w - 1 )
-		scr.clrtoeol()
+		self._scr.addnstr( self._current_line, 0, msg, w - 1 )
+		self._scr.clrtoeol()
 
 		self._current_line += 1
 		if self._current_line >= h :
 			self._current_line = self._top_gap
 
 		if self._current_line > self._top_gap :
-			scr.addstr( self._current_line, 0, '_'*( w - 1 ), curses.A_DIM )
+			self._scr.addstr( self._current_line, 0, '_'*( w - 1 ), curses.A_DIM )
 
 
 def callback_nav_info( msg ):
