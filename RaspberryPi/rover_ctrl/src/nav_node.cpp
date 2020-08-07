@@ -29,6 +29,7 @@
 #define CMD_ID 0xAD
 #define CMD_VEL 0xAA
 #define SET_PI 0xA5
+#define SET_MAXINT 0xA6
 #define ID_F 0xAF
 #define ID_B 0xAB
 
@@ -505,6 +506,14 @@ int main( int argc, char **argv )
 	// Fpr a smoother position control:
 	//send_cmd1( mc_fd, CMD_MOTOR_2_SET_MAX_VEL, 20 );
 	//send_cmd1( mc_fd, CMD_MOTOR_2_SET_POS_PREC, 0.5 );
+
+
+	// Modification of WMC control gains:
+
+	//send_cmd2( wmc_F_fd, SET_PI, 100, 1000 );
+	//send_cmd2( wmc_B_fd, SET_PI, 100, 1000 );
+	//send_cmd2( wmc_F_fd, SET_MAXINT, 2400, 2400 );
+	//send_cmd2( wmc_B_fd, SET_MAXINT, 2400, 2400 );
 
 
 	// Recursive filter in order to smoothen speed variations:
