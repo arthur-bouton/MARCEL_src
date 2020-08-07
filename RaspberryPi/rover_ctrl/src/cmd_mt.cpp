@@ -22,12 +22,12 @@
 #define FT_SERIAL_NUMBER_FRONT "  F-31951"
 #define FT_SERIAL_NUMBER_REAR  "  F-31952"
 
-const float offset_fx[2] = { -36.72, 5.12 };
-const float offset_fy[2] = { -191.85, -165.43 };
-const float offset_fz[2] = { -53.03, -39.12 };
-const float offset_tx[2] = { -1.739, -2.390 };
-const float offset_ty[2] = { 0.545, 0.516 };
-const float offset_tz[2] = { -0.699, -0.497 };
+#define CALIB_NB_SAMPLES 10
+#define CALIB_DURATION 2 // s
+
+// Inital reference values for the vertical forces to be measured by the FT sensors:
+#define FRONT_FZ 65 // N
+#define REAR_FZ  55 // N
 
 
 #define RAD_TO_DEG 57.29577951308232
@@ -302,18 +302,19 @@ bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
 
 
 double ft_time[2] = { 0 };
-std::vector<std::vector<float>> ft_list = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+float ft_list[4][3] = { 0 };
+std::vector<std::vector<float>> ft_offsets = { { 0, 0, FRONT_FZ }, { 0, 0, 0 }, { 0, 0, REAR_FZ }, { 0, 0, 0 } };
 bool ft_dirty[2] = { false };
 
 void wrench_rcv_Callback( const geometry_msgs::WrenchStamped::ConstPtr& msg, int id )
 {
 	ft_time[id] = msg->header.stamp.toSec();
-	ft_list[id*2][0] = msg->wrench.force.y - offset_fy[id];
-	ft_list[id*2][1] = msg->wrench.force.x - offset_fx[id];
-	ft_list[id*2][2] = -msg->wrench.force.z + offset_fz[id];
-	ft_list[id*2+1][0] = msg->wrench.torque.y - offset_ty[id];
-	ft_list[id*2+1][1] = msg->wrench.torque.x - offset_tx[id];
-	ft_list[id*2+1][2] = -msg->wrench.torque.z + offset_tz[id];
+	ft_list[id*2][0] = msg->wrench.force.y - ft_offsets[id*2][0];
+	ft_list[id*2][1] = msg->wrench.force.x - ft_offsets[id*2][1];
+	ft_list[id*2][2] = -msg->wrench.force.z - ft_offsets[id*2][2];
+	ft_list[id*2+1][0] = msg->wrench.torque.y - ft_offsets[id*2+1][0];
+	ft_list[id*2+1][1] = msg->wrench.torque.x - ft_offsets[id*2+1][1];
+	ft_list[id*2+1][2] = -msg->wrench.torque.z - ft_offsets[id*2+1][2];
 
 	ft_dirty[id] = true;
 }
@@ -444,9 +445,37 @@ int main( int argc, char **argv )
 	short angle_x, angle_y;
 #endif
 
+
+	ROS_INFO( "Calibrating the FT sensors..." );
+	std::vector<std::vector<float>> ft_means = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+	for ( int i = 0 ; i < CALIB_NB_SAMPLES ; )
+	{
+		usleep( (float) CALIB_DURATION/CALIB_NB_SAMPLES*1e6 );
+
+		ros::spinOnce();
+
+		if ( ft_dirty[0] && ft_dirty[1] )
+		{
+			for ( int i = 0 ; i < 4 ; i++ )
+				for ( int j = 0 ; j < 3 ; j++ )
+					ft_means[i][j] += ft_list[i][j]/CALIB_NB_SAMPLES;
+
+			ft_dirty[0] = ft_dirty[1] = false;
+
+			i++;
+		}
+	}
+	ft_offsets = ft_means;
+	std::stringstream msg;
+	msg << "FT sensors calibrated with offsets:";
+	for ( int i = 0 ; i < 4 ; i++ )
+		for ( int j = 0 ; j < 3 ; j++ )
+			msg << " " << ft_offsets[i][j];
+	ROS_INFO_STREAM( msg.str() );
+
+
 	float steering_rate;
 	float boggie_torque;
-
 
 	ros::Duration cmd_ctrl_timeout( CMD_CTRL_TIMEOUT );
 
@@ -543,6 +572,11 @@ int main( int argc, char **argv )
 				printf( "%f ", val );
 			printf( "%i %i %i %f %f\n", flip_coeff, node_1, node_2, steering_rate, boggie_torque );
 			fflush( stdout );
+
+			//printf( "%f %f %f | %f %f %f || %f %f %f | %f %f %f\n",
+			        //ft_list[0][0], ft_list[0][1], ft_list[0][2], ft_list[1][0], ft_list[1][1], ft_list[1][2],
+					//ft_list[2][0], ft_list[2][1], ft_list[2][2], ft_list[3][0], ft_list[3][1], ft_list[3][2] );
+			//fflush( stdout );
 		}
 
 
