@@ -82,28 +82,28 @@ int setup_spi( std::vector<unsigned int> csb_list, const char* device="/dev/spid
 	int spi_fd = open( device, O_RDWR );
 	if ( spi_fd < 0 )
 	{
-		perror( "Can't open spidev" );
+		ROS_FATAL( "Can't open spidev: %s", strerror( errno ) );
 		exit( -1 );
 	}
 	if ( ioctl( spi_fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed ) != 0 )
 	{
-		perror( "ioctl couldn't set writing speed" );
+		ROS_FATAL( "ioctl couldn't set writing speed: %s", strerror( errno ) );
 		exit( -1 );
 	}
 	if ( ioctl( spi_fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed ) != 0 )
 	{
-		perror( "ioctl couldn't set reading speed" );
+		ROS_FATAL( "ioctl couldn't set reading speed: %s", strerror( errno ) );
 		exit( -1 );
 	}
 	if ( ioctl( spi_fd, SPI_IOC_WR_MODE, &spi_mode ) != 0 )
 	{
-		perror( "ioctl couldn't set writing mode" );
+		ROS_FATAL( "ioctl couldn't set writing mode: %s", strerror( errno ) );
 		exit( -1 );
 	}
 
 	if ( ioctl( spi_fd, SPI_IOC_RD_MODE, &spi_mode ) != 0 )
 	{
-		perror( "ioctl couldn't set reading mode" );
+		ROS_FATAL( "ioctl couldn't set reading mode: %s", strerror( errno ) );
 		exit( -1 );
 	}
 
@@ -121,7 +121,7 @@ int16_t read_spi( int fd, unsigned int csb, unsigned char cmd )
 
 	if ( write( fd, &cmd, 1 ) != 1 )
 	{
-		perror( "SPI write" );
+		ROS_ERROR( "Failed to write on SPI: %s", strerror( errno ) );
 		exit( -2 );
 	}
 
@@ -173,7 +173,7 @@ int open_uart( const char *device_name, speed_t baudrate )
 
 	if ( fd == -1 )
 	{
-		fprintf( stderr, "Can't open the port %s: %s\n", device_name, strerror( errno ) );
+		ROS_FATAL( "Can't open the port %s: %s", device_name, strerror( errno ) );
 		return -1;
 	}
 
@@ -215,7 +215,7 @@ bool compass_get_bearing( const int fd, float& angle )
 
 	if ( write( fd, &cmd, 1 ) != 1 )
 	{
-		fprintf( stderr, "Failed to request the bearing from the compass: %s\n", strerror( errno ) );
+		ROS_ERROR( "Failed to request the bearing from the compass: %s", strerror( errno ) );
 		return false;
 	}
 
@@ -223,7 +223,7 @@ bool compass_get_bearing( const int fd, float& angle )
 
 	if ( read( fd, &bearing, 2 ) != 2 )
 	{
-		fprintf( stderr, "Failed to receive the bearing from the compass: %s\n", strerror( errno ) );
+		ROS_ERROR( "Failed to receive the bearing from the compass: %s", strerror( errno ) );
 		return false;
 	}
 
@@ -232,7 +232,7 @@ bool compass_get_bearing( const int fd, float& angle )
 
 	if ( bearing > 3599 )
 	{
-		fprintf( stderr, "Wrong bearing value received from the compass: %i\n", bearing );
+		ROS_ERROR( "Wrong bearing value received from the compass: %i", bearing );
 		return false;
 	}
 
@@ -248,7 +248,7 @@ bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
 
 	if ( write( fd, &cmd, 1 ) != 1 )
 	{
-		fprintf( stderr, "Failed to request the data from the compass: %s\n", strerror( errno ) );
+		ROS_ERROR( "Failed to request the data from the compass: %s", strerror( errno ) );
 		return false;
 	}
 
@@ -261,7 +261,7 @@ bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
 
 	if ( read( fd, &data, 4 ) != 4 )
 	{
-		fprintf( stderr, "Failed to receive the data from the compass: %s\n", strerror( errno ) );
+		ROS_ERROR( "Failed to receive the data from the compass: %s", strerror( errno ) );
 		return false;
 	}
 
@@ -272,7 +272,7 @@ bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
 
 	if ( data.bearing > 3599 )
 	{
-		fprintf( stderr, "Wrong bearing value received from the compass: %i\n", data.bearing );
+		ROS_ERROR( "Wrong bearing value received from the compass: %i", data.bearing );
 		data_all_valid = false;
 	}
 	else
@@ -280,7 +280,7 @@ bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
 
 	if ( data.pitch > 90 || data.pitch < -90 )
 	{
-		fprintf( stderr, "Wrong pitch value received from the compass: %i\n", data.pitch );
+		ROS_ERROR( "Wrong pitch value received from the compass: %i", data.pitch );
 		data_all_valid = false;
 	}
 	else
@@ -288,7 +288,7 @@ bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
 
 	if ( data.roll > 90 || data.roll < -90 )
 	{
-		fprintf( stderr, "Wrong roll value received from the compass: %i\n", data.roll );
+		ROS_ERROR( "Wrong roll value received from the compass: %i", data.roll );
 		data_all_valid = false;
 	}
 	else
@@ -392,13 +392,13 @@ int main( int argc, char **argv )
 		}
 		else
 		{
-			ROS_ERROR( "Failed to call service sensor_accessor" );
+			ROS_FATAL( "Failed to call service sensor_accessor" );
 			return -1;
 		}
 	}
 	if ( ft_ids[0] == -1 || ft_ids[1] == -1 )
 	{
-		fprintf( stderr, "Failed to identify both FT sensors\n" );
+		ROS_FATAL( "Failed to identify both FT sensors" );
 		return -1;
 	}
 
@@ -502,7 +502,7 @@ int main( int argc, char **argv )
 			}
 			else if ( fabs( direction_angle - prev_measured_direction ) > jump_threshold )
 			{
-				ROS_ERROR( "Inconsistent jump detected in the heading direction: from %f to %f°", prev_measured_direction, direction_angle );
+				ROS_WARN( "Inconsistent jump detected in the heading direction: from %f to %f°", prev_measured_direction, direction_angle );
 				prev_measured_direction = direction_angle;
 				direction_angle = prev_direction;
 				n_current_check = n_stability_checks;
@@ -573,6 +573,7 @@ int main( int argc, char **argv )
 			printf( "%i %i %i %f %f\n", flip_coeff, node_1, node_2, steering_rate, boggie_torque );
 			fflush( stdout );
 
+			// Output the forces and torques:
 			//printf( "%f %f %f | %f %f %f || %f %f %f | %f %f %f\n",
 			        //ft_list[0][0], ft_list[0][1], ft_list[0][2], ft_list[1][0], ft_list[1][1], ft_list[1][2],
 					//ft_list[2][0], ft_list[2][1], ft_list[2][2], ft_list[3][0], ft_list[3][1], ft_list[3][2] );

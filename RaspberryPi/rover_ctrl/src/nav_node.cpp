@@ -171,7 +171,7 @@ bool send_cmd1( const int fd, const uint8_t cmd, const float val=0 )
 
 	if ( write( fd, buffer, 6 ) != 6 )
 	{
-		fprintf( stderr, "Failed to send [%#04x %f] to file descriptor %d: %s\n", cmd, val, fd, strerror( errno ) );
+		ROS_ERROR( "Failed to send [%#04x %f] to file descriptor %d: %s", cmd, val, fd, strerror( errno ) );
 		return false;
 	}
 
@@ -199,7 +199,7 @@ bool send_cmd2( const int fd, const uint8_t cmd, const float val1=0, const float
 
 	if ( write( fd, buffer, 10 ) != 10 )
 	{
-		fprintf( stderr, "Failed to send [%#04x %f %f] to file descriptor %d: %s\n", cmd, val1, val2, fd, strerror( errno ) );
+		ROS_ERROR( "Failed to send [%#04x %f %f] to file descriptor %d: %s", cmd, val1, val2, fd, strerror( errno ) );
 		return false;
 	}
 
@@ -242,7 +242,7 @@ bool open_and_identify_wmc( const std::string devices[2], speed_t baudrate, int&
 	}
 	else
 	{
-		fprintf( stderr, "Couldn't identify both WMC.\n" );
+		ROS_FATAL( "Couldn't identify both WMC." );
 		return false;
 	}
 
@@ -262,7 +262,7 @@ void read_from_wmc( const int F_fd, const int B_fd )
 	{
 		int rd;
 		if ( ioctl( ( i == 0 ? F_fd : B_fd ), FIONREAD, &rd ) == -1 )
-			fprintf( stderr, "Failed to get the amount of available data from %s: %s\n", ( i == 0 ? "Front WMC" : "Back  WMC" ), strerror( errno ) );
+			ROS_ERROR( "Failed to get the amount of available data from %s: %s", ( i == 0 ? "Front WMC" : "Back  WMC" ), strerror( errno ) );
 		else if ( rd == 0 )
 			continue;
 
@@ -270,7 +270,7 @@ void read_from_wmc( const int F_fd, const int B_fd )
 
 		if ( rd == -1 )
 		{
-			fprintf( stderr, "Failed to read from %s: %s\n", ( i == 0 ? "Front WMC" : "Back  WMC" ), strerror( errno ) );
+			ROS_ERROR( "Failed to read from %s: %s", ( i == 0 ? "Front WMC" : "Back  WMC" ), strerror( errno ) );
 			continue;
 		}
 		else if ( rd == RD_BUF_SIZE - rd_pos[i] - 1 )
@@ -319,7 +319,7 @@ int checksum( const uint8_t* const buffer, const int buf_pos )
 	for ( int i = 0 ; i < FRAME_LENGTH ; i++ )
 		cs ^= buffer[(buf_pos+i)%FRAME_LENGTH];
 	if ( cs != 0 )
-		ROS_WARN( "Checksum failed for header %#04x.", buffer[buf_pos%FRAME_LENGTH] );
+		ROS_ERROR( "Checksum failed for header %#04x.", buffer[buf_pos%FRAME_LENGTH] );
 	return cs;
 }
 
@@ -336,7 +336,7 @@ int read_from_mc( const int fd )
 	int rd = 0;
 
 	if ( ioctl( fd, FIONREAD, &available ) == -1 )
-		fprintf( stderr, "Failed to get the amount of available data from MC: %s\n", strerror( errno ) );
+		ROS_ERROR( "Failed to get the amount of available data from MC: %s", strerror( errno ) );
 	else if ( available < FRAME_LENGTH )
 		return 0;
 
@@ -387,7 +387,7 @@ int read_from_mc( const int fd )
 		buf_pos++;
 	}
 
-	ROS_WARN( "Couldn't identify the frame sent by MC!" );
+	ROS_ERROR( "Couldn't identify the frame sent by MC!" );
 
 	return -1;
 }
@@ -468,7 +468,7 @@ int main( int argc, char **argv )
 
 	if ( signal( SIGINT, stop_procedure ) == SIG_ERR )
 	{
-		perror( "Failed to attribute the stop procedure to the interruption signal" );
+		ROS_FATAL( "Failed to attribute the stop procedure to the interruption signal: %s", strerror( errno ) );
 		return -2;
 	}
 
@@ -555,7 +555,7 @@ int main( int argc, char **argv )
 		while ( read_from_mc( mc_fd ) > 0 ) { last_update_from_mc = ros::Time::now(); }
 		if ( ros::Time::now() - last_update_from_mc >= mc_timeout )
 		{
-			fprintf( stderr, "Haven't received any update from MC for %fs!\n", MC_TIMEOUT );
+			ROS_FATAL( "Haven't received any update from MC for %fs!", MC_TIMEOUT );
 			stop_procedure( 0 );
 		}
 
