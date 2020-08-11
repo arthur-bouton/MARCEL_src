@@ -485,15 +485,15 @@ int main( int argc, char **argv )
 		get_inclinaisons( inc_fd, angle_x, angle_y );
 		compass_dirty = compass_get_bearing( compass_fd, direction_angle );
 #else
-		compass_get_all( compass_fd, direction_angle, angle_x, angle_y );
+		compass_dirty = compass_get_all( compass_fd, direction_angle, angle_x, angle_y );
 #endif
 
-		// Realign the heading direction in relation to the initial angle:
-		direction_angle -= initial_direction;
-
-		// Filter inconsistent bearing values:
 		if ( compass_dirty )
 		{
+			// Realign the heading direction in relation to the initial angle:
+			direction_angle -= initial_direction;
+
+			// Filter inconsistent bearing values:
 			if ( fabs( direction_angle - prev_direction ) <= jump_threshold )
 			{
 				prev_measured_direction = direction_angle;
