@@ -13,6 +13,7 @@
 #include "rover_ctrl/Rov_ctrl.h"
 
 #include "ModelTree/cpp/model_tree.hh" // git clone https://github.com/Bouty92/ModelTree
+#include "Filters/cpp/filters2.hh"
 
 
 #define LMT_YAML_FILE_PATH_1 "/home/ubuntu/MARCEL_src/RaspberryPi/rover_ctrl/tree_params_1.yaml"
@@ -27,7 +28,20 @@
 
 // Inital reference values for the vertical forces to be measured by the FT sensors:
 #define FRONT_FZ 65 // N
-#define REAR_FZ  55 // N
+#define REAR_FZ  60 // N
+
+#define C_FFX 1.589853
+#define C_FFY 2.348946
+#define C_FFZ 1
+#define C_FTX 2.444107
+#define C_FTY 1.328983
+#define C_FTZ 1.673841
+#define C_RFX 1.614392
+#define C_RFY 1.529242
+#define C_RFZ 1
+#define C_RTX 2.044622
+#define C_RTY 1.567537
+#define C_RTZ 2.907380
 
 
 #define RAD_TO_DEG 57.29577951308232
@@ -304,19 +318,40 @@ bool compass_get_all( const int fd, float& bearing, short& roll, short& pitch )
 double ft_time[2] = { 0 };
 float ft_list[4][3] = { 0 };
 std::vector<std::vector<float>> ft_offsets = { { 0, 0, FRONT_FZ }, { 0, 0, 0 }, { 0, 0, REAR_FZ }, { 0, 0, 0 } };
+std::vector<std::vector<float>> ft_coeffs = { { C_FFX, C_FFY, C_FFZ }, { C_FTX, C_FTY, C_FTZ }, { C_RFX, C_RFY, C_RFZ }, { C_RTX, C_RTY, C_RTZ } };
 bool ft_dirty[2] = { false };
+int ft_count = 0;
+bool ft_calibrated = false;
+filters::LP_second_order<float> ft_filters[4][3];
 
 void wrench_rcv_Callback( const geometry_msgs::WrenchStamped::ConstPtr& msg, int id )
 {
 	ft_time[id] = msg->header.stamp.toSec();
-	ft_list[id*2][0] = msg->wrench.force.y - ft_offsets[id*2][0];
-	ft_list[id*2][1] = msg->wrench.force.x - ft_offsets[id*2][1];
-	ft_list[id*2][2] = -msg->wrench.force.z - ft_offsets[id*2][2];
-	ft_list[id*2+1][0] = msg->wrench.torque.y - ft_offsets[id*2+1][0];
-	ft_list[id*2+1][1] = msg->wrench.torque.x - ft_offsets[id*2+1][1];
-	ft_list[id*2+1][2] = -msg->wrench.torque.z - ft_offsets[id*2+1][2];
+	ft_list[id*2][0] = msg->wrench.force.y*ft_coeffs[id*2][0] - ft_offsets[id*2][0];
+	ft_list[id*2][1] = msg->wrench.force.x*ft_coeffs[id*2][1] - ft_offsets[id*2][1];
+	ft_list[id*2][2] = -msg->wrench.force.z*ft_coeffs[id*2][2] - ft_offsets[id*2][2];
+	ft_list[id*2+1][0] = msg->wrench.torque.y*ft_coeffs[id*2+1][0] - ft_offsets[id*2+1][0];
+	ft_list[id*2+1][1] = msg->wrench.torque.x*ft_coeffs[id*2+1][1] - ft_offsets[id*2+1][1];
+	ft_list[id*2+1][2] = -msg->wrench.torque.z*ft_coeffs[id*2+1][2] - ft_offsets[id*2+1][2];
 
 	ft_dirty[id] = true;
+
+	// Filter the values:
+	if ( ft_calibrated )
+		for ( int i = id*2 ; i < id*2+2 ; i++ )
+			for ( int j = 0 ; j < 3 ; j++ )
+				ft_filters[i][j].update();
+
+	//if ( ft_calibrated && ft_dirty[0] && ft_dirty[1] )
+	//{
+		//printf( "ft 0 %f %f %f %f %f %f %f %f %f %f %f %f\n",
+				//ft_list[0][0], ft_list[0][1], ft_list[0][2], ft_list[1][0], ft_list[1][1], ft_list[1][2],
+				//ft_list[2][0], ft_list[2][1], ft_list[2][2], ft_list[3][0], ft_list[3][1], ft_list[3][2] );
+		//fflush( stdout );
+
+		//ft_dirty[0] = ft_dirty[1] = false;
+		//++ft_count;
+	//}
 }
 
 
@@ -402,8 +437,13 @@ int main( int argc, char **argv )
 		return -1;
 	}
 
-	ros::Subscriber sub_w0 = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_0", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[0] ) );
-	ros::Subscriber sub_w1 = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_1", 1, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[1] ) );
+	// Initialisation of the force-torque filters:
+	for ( int i = 0 ; i < 4 ; i++ )
+		for ( int j = 0 ; j < 3 ; j++ )
+			ft_filters[i][j].init_bilinear( 0.016, M_PI, 0.5, &ft_list[i][j], &ft_list[i][j] );
+
+	ros::Subscriber sub_w0 = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_0", 100, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[0] ) );
+	ros::Subscriber sub_w1 = nh.subscribe<geometry_msgs::WrenchStamped>( "ft_wrench_1", 100, std::bind( wrench_rcv_Callback, std::placeholders::_1, ft_ids[1] ) );
 
 
 	ros::Subscriber sub_j = nh.subscribe<rover_ctrl::Joints_info>( "joints_info", 1, joints_info_rcv_Callback );
@@ -472,6 +512,7 @@ int main( int argc, char **argv )
 		for ( int j = 0 ; j < 3 ; j++ )
 			msg << " " << ft_offsets[i][j];
 	ROS_INFO_STREAM( msg.str() );
+	ft_calibrated = true;
 
 
 	float steering_rate;
@@ -522,8 +563,8 @@ int main( int argc, char **argv )
 		ros::spinOnce();
 
 
-		if ( ft_dirty[0] && ft_dirty[1] && joints_info_dirty )
-		{
+		//if ( ft_dirty[0] && ft_dirty[1] && joints_info_dirty )
+		//{
 			// Flip or not the left and right to account for the robot's symmetry:
 			int flip_coeff = cj_angle < 0 ? -1 : 1;
 
@@ -543,13 +584,13 @@ int main( int argc, char **argv )
 			}
 
 			// Infer the controls to apply:
-			if ( fabs( state[5] ) > 20 )
+			//if ( fabs( state[5] ) > 20 )
 				steering_rate = flip_coeff*lmt_1.predict( state, node_1 );
-			else
-			{
-				steering_rate = 0.5*state[0];
-				node_1 = 0;
-			}
+			//else
+			//{
+				//steering_rate = -0.5*state[0];
+				//node_1 = 0;
+			//}
 			boggie_torque = flip_coeff*lmt_2.predict( state, node_2 );
 
 			// Clip the control values:
@@ -578,7 +619,13 @@ int main( int argc, char **argv )
 			        //ft_list[0][0], ft_list[0][1], ft_list[0][2], ft_list[1][0], ft_list[1][1], ft_list[1][2],
 					//ft_list[2][0], ft_list[2][1], ft_list[2][2], ft_list[3][0], ft_list[3][1], ft_list[3][2] );
 			//fflush( stdout );
-		}
+
+			//printf( "cmd %i %f %f %f %f %f %f %f %f %f %f %f %f\n", ft_count,
+					//ft_list[0][0], ft_list[0][1], ft_list[0][2], ft_list[1][0], ft_list[1][1], ft_list[1][2],
+					//ft_list[2][0], ft_list[2][1], ft_list[2][2], ft_list[3][0], ft_list[3][1], ft_list[3][2] );
+			//ft_count = 0;
+			//fflush( stdout );
+		//}
 
 
 		loop_rate.sleep();

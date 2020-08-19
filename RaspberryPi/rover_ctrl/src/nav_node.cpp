@@ -512,8 +512,8 @@ int main( int argc, char **argv )
 
 	//send_cmd2( wmc_F_fd, SET_PI, 100, 1000 );
 	//send_cmd2( wmc_B_fd, SET_PI, 100, 1000 );
-	//send_cmd2( wmc_F_fd, SET_MAXINT, 2400, 2400 );
-	//send_cmd2( wmc_B_fd, SET_MAXINT, 2400, 2400 );
+	send_cmd2( wmc_F_fd, SET_MAXINT, 4000, 4000 );
+	send_cmd2( wmc_B_fd, SET_MAXINT, 4000, 4000 );
 
 
 	// Recursive filter in order to smoothen speed variations:
