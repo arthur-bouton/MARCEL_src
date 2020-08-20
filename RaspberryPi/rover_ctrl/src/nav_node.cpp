@@ -59,6 +59,10 @@
 #define CMD_MOTOR_2_SET_MAX_VEL 0x33
 #define CMD_MOTOR_2_SET_POS_PREC 0x34
 
+#define CMD_SET_REF_ANGLE_A 0x51
+#define CMD_SET_REF_ANGLE_B 0x52
+#define CMD_SET_REF_ANGLE_C 0x54
+
 #define FRAME_LENGTH 10
 #define N_LAST_FRAMES 2
 
@@ -503,9 +507,16 @@ int main( int argc, char **argv )
 	//send_cmd1( mc_fd, CMD_MOTOR_2_VEL_SET_KP, 1 );
 	//send_cmd1( mc_fd, CMD_MOTOR_2_VEL_SET_KI, 1 );
 	//send_cmd1( mc_fd, CMD_MOTOR_2_SET_MAX_VEL, 30 );
-	// Fpr a smoother position control:
+	// For a smoother position control:
 	//send_cmd1( mc_fd, CMD_MOTOR_2_SET_MAX_VEL, 20 );
 	//send_cmd1( mc_fd, CMD_MOTOR_2_SET_POS_PREC, 0.5 );
+
+	//sleep( 1 );
+
+	// Recalibrate the encoders:
+	//send_cmd1( mc_fd, CMD_SET_REF_ANGLE_A, -207.1 );
+	//send_cmd1( mc_fd, CMD_SET_REF_ANGLE_B, 86.3 );
+	//send_cmd1( mc_fd, CMD_SET_REF_ANGLE_C, -92.1 );
 
 
 	// Modification of WMC control gains:
@@ -630,6 +641,7 @@ int main( int argc, char **argv )
 			send_cmd1( mc_fd, CMD_MOTOR_2_TOR, torque_cmd );
 		}
 
+		//printf( "Steering angle: %f | Boggie angle: %f | Boggie torque: %f\n", cj_angle, sea_angle, sea_torque );
 		//printf( "angle_A: %f | vel_A: %f | boggie_angle: %f | boggie_torque: %f | loop duration: %f\n", cj_angle, cj_rate, sea_angle, sea_torque, dt );
 		//printf( "%f %f %f %f\n", w_cmd[0], w_cmd[1], w_cmd[2], w_cmd[3] );
 

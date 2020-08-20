@@ -54,6 +54,10 @@
 #define CMD_MOTOR_2_SET_MAX_VEL 0x33
 #define CMD_MOTOR_2_SET_POS_PREC 0x34
 
+#define CMD_SET_REF_ANGLE_A 0x51
+#define CMD_SET_REF_ANGLE_B 0x52
+#define CMD_SET_REF_ANGLE_C 0x54
+
 #define HDR_CJ_ANGLE_RATE 0xCA
 #define HDR_SEA_ANGLE_TOR 0x5A
 
@@ -63,9 +67,9 @@
 #define SEA_STIFFNESS 0.265 // N.m/°
 #define SEA_HALF_DEADZONE 1 // °
 
-#define REF_ANGLE_A -189.5 // °
-#define REF_ANGLE_B 90.1 // °
-#define REF_ANGLE_C -89.3 // °
+#define REF_ANGLE_A -207.1 // °
+#define REF_ANGLE_B 86.3 // °
+#define REF_ANGLE_C -92.1 // °
 
 #define LOOP_PERIOD 50000 // µs
 //#define LOOP_PERIOD 0 // µs
@@ -649,6 +653,45 @@ int read_from_sbc()
 					return 2;
 				}
 				break;
+
+			case CMD_SET_REF_ANGLE_A :
+				
+				if ( checksum( rd_buf, buf_pos ) == 0 )
+				{
+					for ( int i = 0 ; i < FRAME_LENGTH - 2 ; i++ )
+						data.bytes[i] = rd_buf[(buf_pos+1+i)%FRAME_LENGTH];
+
+					ref_angle_A = data.fval;
+
+					return 4;
+				}
+				break;
+
+			case CMD_SET_REF_ANGLE_B :
+				
+				if ( checksum( rd_buf, buf_pos ) == 0 )
+				{
+					for ( int i = 0 ; i < FRAME_LENGTH - 2 ; i++ )
+						data.bytes[i] = rd_buf[(buf_pos+1+i)%FRAME_LENGTH];
+
+					ref_angle_B = data.fval;
+
+					return 4;
+				}
+				break;
+
+			case CMD_SET_REF_ANGLE_C :
+				
+				if ( checksum( rd_buf, buf_pos ) == 0 )
+				{
+					for ( int i = 0 ; i < FRAME_LENGTH - 2 ; i++ )
+						data.bytes[i] = rd_buf[(buf_pos+1+i)%FRAME_LENGTH];
+
+					ref_angle_C = data.fval;
+
+					return 4;
+				}
+				break;
 		}
 
 		buf_pos++;
@@ -715,7 +758,6 @@ void update_angles()
 
 void loop()
 {
-	float dt = elapsed_loop_time;
 	elapsed_loop_time = 0;
 
 
