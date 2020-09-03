@@ -4,11 +4,16 @@ import rospy
 from rover_ctrl.msg import Rov_ctrl, Joints_info
 from std_msgs.msg import String
 import os
+import numpy as np
 
 
-angle_amplitude = 40 #°
-torque_amplitude = 5 #N.m
+angle_amplitude = 30 #°
 angle_margin = 0.5 #°
+angle_rate = 15 #°/s
+angle_rate_up_ramp_duration = 1 #s
+angle_rate_down_ramp_duration = 1 #s
+
+torque_amplitude = 10 #N.m
 torque_margin = 0.5 #N.m
 
 
@@ -20,6 +25,8 @@ def callback_joints( msg ):
 
 	actual_angle = msg.cj_angle
 	actual_torque = msg.sea_torque
+
+	print actual_angle, actual_torque
 
 
 def callback_string( msg ):
@@ -39,7 +46,7 @@ try :
 
 	cmd.engaged = True
 	cmd.crawling_mode = True
-	cmd.rate_mode = False
+	cmd.rate_mode = True
 	cmd.speed = 0.0
 	cmd.torque = 0.0
 
@@ -58,7 +65,17 @@ try :
 
 	def target_angle( angle ) :
 
-		cmd.steer = angle
+		for rate in np.linspace( 0, ( -1 if angle < 0 else 1 )*angle_rate, int( angle_rate_up_ramp_duration//period ) ) :
+
+			if ( -1 if angle < 0 else 1 )*actual_angle + angle_margin >= abs( angle ) :
+				break
+
+			cmd.steer = rate
+
+			cmd.header.stamp = rospy.Time.now()
+			pub.publish( cmd )
+
+			rospy.sleep( period )
 
 		while ( -1 if angle < 0 else 1 )*actual_angle + angle_margin < abs( angle ) :
 
@@ -67,16 +84,25 @@ try :
 
 			rospy.sleep( period )
 
+		for rate in np.linspace( ( -1 if angle < 0 else 1 )*angle_rate, 0, int( angle_rate_down_ramp_duration//period ) ) :
 
-	#target_torque( -torque_amplitude )
+			cmd.steer = rate
+
+			cmd.header.stamp = rospy.Time.now()
+			pub.publish( cmd )
+
+			rospy.sleep( period )
+
+
+	target_torque( -torque_amplitude )
 	target_angle( angle_amplitude )
 
 	while not rospy.is_shutdown() :
 
-		#target_torque( torque_amplitude )
+		target_torque( torque_amplitude )
 		target_angle( -angle_amplitude )
 
-		#target_torque( -torque_amplitude )
+		target_torque( -torque_amplitude )
 		target_angle( angle_amplitude )
 
 
