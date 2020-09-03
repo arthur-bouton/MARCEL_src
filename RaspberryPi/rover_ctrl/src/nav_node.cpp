@@ -600,21 +600,21 @@ int main( int argc, char **argv )
 			if ( crawling_mode_cmd )
 			{
 				// Look for the minimal robot speed that prevents any wheel from going backward:
-				if ( speed_cmd_filtered >= 0 )
+				if ( speed_cmd_filtered >= -1e-2 )
 					min_speed = std::max( min_speed, -trans[i]*_1diff[i] );
 				else
 					min_speed = std::min( min_speed, -trans[i]*_1diff[i] );
 			}
 		}
 		// Assert that the robot speed is high enough:
-		if ( speed_cmd_filtered >= 0 )
+		if ( speed_cmd_filtered >= -1e-2 )
 			final_speed = std::max( speed_cmd_filtered, min_speed );
 		else
 			final_speed = std::min( speed_cmd_filtered, min_speed );
 
 		// Reduce the robot speed according to the wheel speed limit:
 		for ( int i = 0 ; i < 4 ; i++ )
-			if ( speed_cmd_filtered >= 0 )
+			if ( speed_cmd_filtered >= -1e-2 )
 				final_speed = std::min( final_speed, ( (float) WSPEED_MAX*WRADIUS - trans[i] )*_1diff[i] );
 			else
 				final_speed = std::max( final_speed, ( (float) -WSPEED_MAX*WRADIUS - trans[i] )*_1diff[i] );
