@@ -1,18 +1,28 @@
 #!/usr/bin/python2.7
 # -*- coding: utf-8 -*-
 import rospy
-from rover_ctrl.msg import Rov_ctrl
+from rover_ctrl.msg import Rov_ctrl, Joints_info
 from std_msgs.msg import String
 import os
 
 
 angle_amplitude = 40 #°
-angle_duration = 10 #s
 torque_amplitude = 5 #N.m
-torque_duration = 1 #s
+angle_margin = 0.5 #°
+torque_margin = 0.5 #N.m
 
 
-def callback_info( msg ):
+actual_angle = 0
+actual_torque = 0
+
+def callback_joints( msg ):
+	global actual_angle, actual_torque
+
+	actual_angle = msg.cj_angle
+	actual_torque = msg.sea_torque
+
+
+def callback_string( msg ):
 	print( msg.data )
 
 
@@ -20,9 +30,10 @@ try :
 
 	pub = rospy.Publisher( 'nav_ctrl', Rov_ctrl, queue_size=10 )
 	rospy.init_node( 'crawling_gait', disable_signals=True )
-	sub_info = rospy.Subscriber( 'nav_info_string', String, callback_info )
+	joints_info = rospy.Subscriber( 'joints_info', Joints_info, callback_joints )
+	string_info = rospy.Subscriber( 'nav_info_string', String, callback_string )
 
-	repeat_period = rospy.get_param( '~repeat_period', 500 )*1e-3
+	period = rospy.get_param( '~period', 100 )*1e-3
 
 	cmd = Rov_ctrl()
 
@@ -33,60 +44,40 @@ try :
 	cmd.torque = 0.0
 
 
-	def ask_torque( torque, duration ) :
-
-		n_full_periods = int( duration//( repeat_period ) )
-		extra_time = duration%( repeat_period )
+	def target_torque( torque ) :
 
 		cmd.torque = torque
 
-		for _ in range( n_full_periods ) :
+		while ( -1 if torque < 0 else 1 )*actual_torque + torque_margin < abs( torque ) :
 
 			cmd.header.stamp = rospy.Time.now()
 			pub.publish( cmd )
 
-			rospy.sleep( repeat_period )
-
-		if extra_time > 0 :
-
-			cmd.header.stamp = rospy.Time.now()
-			pub.publish( cmd )
-
-			rospy.sleep( extra_time )
+			rospy.sleep( period )
 
 
-	def ask_angle( angle, duration ) :
-
-		n_full_periods = int( duration//( repeat_period ) )
-		extra_time = duration%( repeat_period )
+	def target_angle( angle ) :
 
 		cmd.steer = angle
 
-		for _ in range( n_full_periods ) :
+		while ( -1 if angle < 0 else 1 )*actual_angle + angle_margin < abs( angle ) :
 
 			cmd.header.stamp = rospy.Time.now()
 			pub.publish( cmd )
 
-			rospy.sleep( repeat_period )
-
-		if extra_time > 0 :
-
-			cmd.header.stamp = rospy.Time.now()
-			pub.publish( cmd )
-
-			rospy.sleep( extra_time )
+			rospy.sleep( period )
 
 
-	#ask_torque( -torque_amplitude, torque_duration )
-	ask_angle( angle_amplitude, angle_duration/2 )
+	#target_torque( -torque_amplitude )
+	target_angle( angle_amplitude )
 
 	while not rospy.is_shutdown() :
 
-		#ask_torque( torque_amplitude, torque_duration )
-		ask_angle( -angle_amplitude, angle_duration )
+		#target_torque( torque_amplitude )
+		target_angle( -angle_amplitude )
 
-		#ask_torque( -torque_amplitude, torque_duration )
-		ask_angle( angle_amplitude, angle_duration )
+		#target_torque( -torque_amplitude )
+		target_angle( angle_amplitude )
 
 
 except KeyboardInterrupt :
