@@ -46,7 +46,7 @@ try :
 	msg_lines = Print_manager( stdscr, 3 )
 
 	pub = rospy.Publisher( 'nav_ctrl', Rov_ctrl, queue_size=1 )
-	rospy.init_node( 'keyboard_ctrl' )
+	rospy.init_node( 'keyboard_ctrl', disable_signals=True )
 	sub_info = rospy.Subscriber( 'nav_info_string', String, callback_info )
 
 	repeat_period = rospy.get_param( '~repeat_period', 500 )
@@ -162,8 +162,7 @@ except KeyboardInterrupt :
 	cmd.header.stamp = rospy.Time.now()
 	pub.publish( cmd )
 
-#except rospy.ROSInterruptException :
-	#pass
+	rospy.signal_shutdown( 'Received SIGINT' )
 
 finally :
 	curses.endwin()
