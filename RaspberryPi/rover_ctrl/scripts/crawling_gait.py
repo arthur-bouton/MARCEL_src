@@ -13,7 +13,7 @@ angle_rate = 15 #°/s
 angle_rate_up_ramp_duration = 1 #s
 angle_rate_down_ramp_duration = 1 #s
 
-torque_amplitude = 10 #N.m
+torque_amplitude = 15 #N.m
 torque_margin = 0.5 #N.m
 
 
@@ -26,21 +26,12 @@ def callback_joints( msg ):
 	actual_angle = msg.cj_angle
 	actual_torque = msg.sea_torque
 
-	print actual_angle, actual_torque
-
 
 def callback_string( msg ):
 	print( msg.data )
 
 
 try :
-
-	pub = rospy.Publisher( 'nav_ctrl', Rov_ctrl, queue_size=10 )
-	rospy.init_node( 'crawling_gait', disable_signals=True )
-	joints_info = rospy.Subscriber( 'joints_info', Joints_info, callback_joints )
-	string_info = rospy.Subscriber( 'nav_info_string', String, callback_string )
-
-	period = rospy.get_param( '~period', 100 )*1e-3
 
 	cmd = Rov_ctrl()
 
@@ -50,6 +41,19 @@ try :
 	cmd.speed = 0.0
 	cmd.torque = 0.0
 
+	pub = rospy.Publisher( 'nav_ctrl', Rov_ctrl, queue_size=10 )
+	rospy.init_node( 'crawling_gait', disable_signals=True )
+	joints_info = rospy.Subscriber( 'joints_info', Joints_info, callback_joints )
+	string_info = rospy.Subscriber( 'nav_info_string', String, callback_string )
+
+	period = rospy.get_param( '~period', 100 )*1e-3
+
+
+	def publish_cmd() :
+		cmd.header.stamp = rospy.Time.now()
+		pub.publish( cmd )
+		print rospy.get_time(), cmd.steer, cmd.torque, actual_angle, actual_torque
+
 
 	def target_torque( torque ) :
 
@@ -57,8 +61,7 @@ try :
 
 		while ( -1 if torque < 0 else 1 )*actual_torque + torque_margin < abs( torque ) :
 
-			cmd.header.stamp = rospy.Time.now()
-			pub.publish( cmd )
+			publish_cmd()
 
 			rospy.sleep( period )
 
@@ -72,15 +75,13 @@ try :
 
 			cmd.steer = rate
 
-			cmd.header.stamp = rospy.Time.now()
-			pub.publish( cmd )
+			publish_cmd()
 
 			rospy.sleep( period )
 
 		while ( -1 if angle < 0 else 1 )*actual_angle + angle_margin < abs( angle ) :
 
-			cmd.header.stamp = rospy.Time.now()
-			pub.publish( cmd )
+			publish_cmd()
 
 			rospy.sleep( period )
 
@@ -88,8 +89,7 @@ try :
 
 			cmd.steer = rate
 
-			cmd.header.stamp = rospy.Time.now()
-			pub.publish( cmd )
+			publish_cmd()
 
 			rospy.sleep( period )
 
@@ -109,7 +109,6 @@ try :
 except KeyboardInterrupt :
 	cmd.engaged = False
 
-	cmd.header.stamp = rospy.Time.now()
-	pub.publish( cmd )
+	publish_cmd()
 
 	rospy.signal_shutdown( 'Received SIGINT' )
