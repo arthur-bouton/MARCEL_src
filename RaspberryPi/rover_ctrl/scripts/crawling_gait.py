@@ -7,14 +7,15 @@ import os
 import numpy as np
 
 
-angle_amplitude = 30 #°
+angle_amplitude = 35 #°
 angle_margin = 0.5 #°
-angle_rate = 15 #°/s
+angle_rate = 10 #°/s
 angle_rate_up_ramp_duration = 1 #s
 angle_rate_down_ramp_duration = 1 #s
 
-torque_amplitude = 15 #N.m
-torque_margin = 0.5 #N.m
+torque_low = 10 #N.m
+torque_high = 15 #N.m
+torque_margin = 1 #N.m
 
 
 actual_angle = 0
@@ -55,6 +56,13 @@ try :
 		print rospy.get_time(), cmd.steer, cmd.torque, actual_angle, actual_torque
 
 
+	def get_desired_torque( sign ) :
+
+		desired_torque = torque_high - ( torque_high - torque_low )*abs( actual_angle )/angle_amplitude
+
+		return sign*desired_torque
+
+
 	def target_torque( torque ) :
 
 		cmd.torque = torque
@@ -74,12 +82,15 @@ try :
 				break
 
 			cmd.steer = rate
+			cmd.torque = get_desired_torque( -1 if angle > 0 else 1 )
 
 			publish_cmd()
 
 			rospy.sleep( period )
 
 		while ( -1 if angle < 0 else 1 )*actual_angle + angle_margin < abs( angle ) :
+
+			cmd.torque = get_desired_torque( -1 if angle > 0 else 1 )
 
 			publish_cmd()
 
@@ -88,21 +99,22 @@ try :
 		for rate in np.linspace( ( -1 if angle < 0 else 1 )*angle_rate, 0, int( angle_rate_down_ramp_duration//period ) ) :
 
 			cmd.steer = rate
+			cmd.torque = get_desired_torque( -1 if angle > 0 else 1 )
 
 			publish_cmd()
 
 			rospy.sleep( period )
 
 
-	target_torque( -torque_amplitude )
+	target_torque( -torque_low )
 	target_angle( angle_amplitude )
 
 	while not rospy.is_shutdown() :
 
-		target_torque( torque_amplitude )
+		target_torque( torque_low )
 		target_angle( -angle_amplitude )
 
-		target_torque( -torque_amplitude )
+		target_torque( -torque_low )
 		target_angle( angle_amplitude )
 
 
