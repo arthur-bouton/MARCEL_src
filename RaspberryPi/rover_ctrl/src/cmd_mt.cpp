@@ -27,21 +27,34 @@
 #define CALIB_DURATION 2 // s
 
 // Inital reference values for the vertical forces to be measured by the FT sensors:
-#define FRONT_FZ 65 // N
-#define REAR_FZ  60 // N
+#define FRONT_FZ 75 // N
+#define REAR_FZ  51.7 // N
 
-#define C_FFX 1.589853
-#define C_FFY 2.348946
+//#define C_FFX 1.589853
+//#define C_FFY 2.348946
+//#define C_FFZ 1
+//#define C_FTX 2.444107
+//#define C_FTY 1.328983
+//#define C_FTZ 1.673841
+//#define C_RFX 1.614392
+//#define C_RFY 1.529242
+//#define C_RFZ 1
+//#define C_RTX 2.044622
+//#define C_RTY 1.567537
+//#define C_RTZ 2.907380
+
+#define C_FFX 1
+#define C_FFY 1
 #define C_FFZ 1
-#define C_FTX 2.444107
-#define C_FTY 1.328983
-#define C_FTZ 1.673841
-#define C_RFX 1.614392
-#define C_RFY 1.529242
+#define C_FTX 1
+#define C_FTY 1
+#define C_FTZ 1
+#define C_RFX 1
+#define C_RFY 1
 #define C_RFZ 1
-#define C_RTX 2.044622
-#define C_RTY 1.567537
-#define C_RTZ 2.907380
+#define C_RTX 1
+#define C_RTY 1
+#define C_RTZ 1
 
 
 #define RAD_TO_DEG 57.29577951308232
@@ -54,7 +67,7 @@
 #define USE_ONBOARD_INCLINOMETER
 
 #define STEERING_MAX_VEL  (float) 15 // °/s
-#define BOGGIE_MAX_TORQUE (float) 20 // N.m
+#define BOGGIE_MAX_TORQUE (float) 25 // N.m
 
 
 //===============================================================//
@@ -379,6 +392,7 @@ void cmd_ctrl_rcv_Callback( const rover_ctrl::Rov_ctrl::ConstPtr& msg )
 	nav_ctrl_msg.header.stamp = msg->header.stamp;
 	nav_ctrl_msg.engaged = msg->engaged;
 	nav_ctrl_msg.speed = msg->speed;
+	nav_ctrl_msg.crawling_mode = msg->crawling_mode;
 	nav_ctrl_pub.publish( nav_ctrl_msg );
 
 	last_update_cmd_ctrl = msg->header.stamp;
@@ -572,7 +586,8 @@ int main( int argc, char **argv )
 		//if ( ft_dirty[0] && ft_dirty[1] && joints_info_dirty )
 		//{
 			// Flip or not the left and right to account for the robot's symmetry:
-			int flip_coeff = cj_angle < 0 ? -1 : 1;
+			//int flip_coeff = cj_angle < 0 ? -1 : 1;
+			int flip_coeff = 1;
 
 			// Build the current state:
 			std::vector<float> state;
