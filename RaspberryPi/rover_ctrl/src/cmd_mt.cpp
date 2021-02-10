@@ -485,6 +485,10 @@ int main( int argc, char **argv )
 	short angle_x, angle_y;
 #endif
 
+	filters::LP_second_order<float> angle_x_filter, angle_y_filter;
+	angle_x_filter.init_bilinear( 0.1, M_PI, 0.5, &angle_x, &angle_x );
+	angle_y_filter.init_bilinear( 0.1, M_PI, 0.5, &angle_y, &angle_y );
+
 
 	ROS_INFO( "Calibrating the FT sensors..." );
 	std::vector<std::vector<float>> ft_means = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
@@ -528,6 +532,8 @@ int main( int argc, char **argv )
 #else
 		compass_dirty = compass_get_all( compass_fd, direction_angle, angle_x, angle_y );
 #endif
+		angle_x_filter.update();
+		angle_y_filter.update();
 
 		if ( compass_dirty )
 		{
