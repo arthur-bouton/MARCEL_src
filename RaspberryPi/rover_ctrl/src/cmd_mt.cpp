@@ -469,7 +469,7 @@ int main( int argc, char **argv )
 	nav_ctrl_msg.steer = 0;
 	nav_ctrl_msg.torque = 0;
 	nav_ctrl_msg.rate_mode = true;
-	nav_ctrl_msg.crawling_mode = false;
+	nav_ctrl_msg.crawling_mode = true;
 
 
 	// Give the processing of the operator's inputs its own thread so that controls are passed asynchronously to the nav_node:
