@@ -521,10 +521,10 @@ int main( int argc, char **argv )
 
 	// Modification of WMC control gains:
 
-	//send_cmd2( wmc_F_fd, SET_PI, 100, 1000 );
-	//send_cmd2( wmc_B_fd, SET_PI, 100, 1000 );
-	send_cmd2( wmc_F_fd, SET_MAXINT, 4000, 4000 );
-	send_cmd2( wmc_B_fd, SET_MAXINT, 4000, 4000 );
+	send_cmd2( wmc_F_fd, SET_PI, 120, 2000 );
+	send_cmd2( wmc_B_fd, SET_PI, 120, 2000 );
+	send_cmd2( wmc_F_fd, SET_MAXINT, 10000, 10000 );
+	send_cmd2( wmc_B_fd, SET_MAXINT, 10000, 10000 );
 
 
 	// Recursive filter in order to smoothen speed variations:

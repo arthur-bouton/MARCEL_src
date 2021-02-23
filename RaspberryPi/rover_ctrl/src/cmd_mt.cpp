@@ -591,7 +591,7 @@ int main( int argc, char **argv )
 
 			// Build the current state:
 			std::vector<float> state;
-			state.push_back( flip_coeff*direction_angle );
+			state.push_back( -flip_coeff*direction_angle );
 			state.push_back( flip_coeff*cj_angle );
 			state.push_back( flip_coeff*angle_x );
 			state.push_back( angle_y );
