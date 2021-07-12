@@ -104,6 +104,10 @@ def get_desired_torque( rate_sign ) :
 
 	desired_torque = torque_middle - ( torque_middle - torque_edge )*abs( actual_angle + rate_sign*torque_peak )/( angle_amplitude - peak_sign*torque_peak )
 
+	# Compensate the non-linearity:
+	if desired_torque > 0 :
+		desired_torque *= 1.2
+
 	return -rate_sign*desired_torque
 
 
