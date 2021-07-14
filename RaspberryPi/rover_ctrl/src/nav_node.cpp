@@ -514,7 +514,7 @@ int main( int argc, char **argv )
 	//sleep( 1 );
 
 	// Recalibrate the encoders:
-	send_cmd1( mc_fd, CMD_SET_REF_ANGLE_A, -90.0 );
+	send_cmd1( mc_fd, CMD_SET_REF_ANGLE_A, -88.0 );
 	send_cmd1( mc_fd, CMD_SET_REF_ANGLE_B, 84.0 );
 	send_cmd1( mc_fd, CMD_SET_REF_ANGLE_C, -91.9 );
 

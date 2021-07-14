@@ -60,7 +60,7 @@
 #define RAD_TO_DEG 57.29577951308232
 
 
-#define LOOP_FREQ 2 // Hz
+#define LOOP_FREQ 4 // Hz
 
 #define CMD_CTRL_TIMEOUT 1. // s
 
@@ -606,13 +606,13 @@ int main( int argc, char **argv )
 
 			// Infer the controls to apply:
 			//if ( fabs( state[5] ) > 20 )
-				steering_rate = flip_coeff*lmt_1.predict( state, node_1 );
+				steering_rate = flip_coeff*lmt_1.predict( state, node_1 )*0.9;
 			//else
 			//{
 				//steering_rate = -0.5*state[0];
 				//node_1 = 0;
 			//}
-			boggie_torque = flip_coeff*lmt_2.predict( state, node_2 );
+			boggie_torque = flip_coeff*lmt_2.predict( state, node_2 )*1.1;
 
 			// Clip the control values:
 			steering_rate = std::min( std::max( -STEERING_MAX_VEL, steering_rate ), STEERING_MAX_VEL );
