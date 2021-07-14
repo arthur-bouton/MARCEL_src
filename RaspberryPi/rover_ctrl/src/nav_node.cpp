@@ -32,6 +32,8 @@
 #define SET_MAXINT 0xA6
 #define ID_F 0xAF
 #define ID_B 0xAB
+#define PASSIVE_BREAK 0xAE
+#define ACTIVE_BREAK 0xAF
 
 #define MC_DEVICE "/dev/serial0"
 #define MC_BAUDRATE B921600
@@ -403,6 +405,9 @@ int mc_fd, wmc_F_fd, wmc_B_fd;
 
 void disengage_all()
 {
+	send_cmd2( wmc_F_fd, PASSIVE_BREAK );
+	send_cmd2( wmc_B_fd, PASSIVE_BREAK );
+
 	send_cmd2( wmc_F_fd, CMD_VEL, 0, 0 );
 	send_cmd2( wmc_B_fd, CMD_VEL, 0, 0 );
 
@@ -414,6 +419,15 @@ void stop_procedure( int sig )
 {
 	disengage_all();
 	exit( 0 );
+}
+
+
+void engage()
+{
+	send_cmd2( wmc_F_fd, ACTIVE_BREAK );
+	send_cmd2( wmc_B_fd, ACTIVE_BREAK );
+
+	send_cmd1( mc_fd, CMD_ENGAGE, 0 );
 }
 
 
@@ -431,11 +445,9 @@ void cmd_rcv_Callback( const rover_ctrl::Rov_ctrl::ConstPtr& msg )
 	if ( msg->engaged != engaged_cmd )
 	{
 		if ( ! msg->engaged )
-		{
 			disengage_all();
-		}
 		else
-			send_cmd1( mc_fd, CMD_ENGAGE, 0 );
+			engage();
 	}
 	engaged_cmd = msg->engaged;
 	speed_cmd = msg->speed;
@@ -567,7 +579,7 @@ int main( int argc, char **argv )
 		else if ( ! nav_ctrl_connected && ! disconnection )
 		{
 			if ( engaged_cmd )
-				send_cmd1( mc_fd, CMD_ENGAGE, 0 );
+				engage();
 			nav_ctrl_connected = true;
 		}
 
