@@ -8,16 +8,12 @@ from geometry_msgs.msg import WrenchStamped
 import numpy as np
 
 
-angle_amplitude = 35 #°
+angle_amplitude = 40 #°
 angle_margin = 0.5 #°
 angle_rate = 10 #°/s
 angle_rate_up_ramp_duration = 1 #s
 angle_rate_down_ramp_duration = 1 #s
 
-torque_start  = 15 #N.m
-torque_middle = 25 #N.m
-torque_end    = 20 #N.m
-torque_peak   = 1 #°
 torque_margin = 1 #N.m
 
 FT_SERIAL_NUMBER_REAR = "  F-31952"
@@ -93,7 +89,12 @@ def publish_cmd() :
 	print rospy.get_time(), cmd.steer, cmd.torque, actual_angle, deduced_torque, actual_torque
 
 
-def get_desired_torque( rate_sign ) :
+torque_start  = 18 #N.m
+torque_middle = 32 #N.m
+torque_end    = 24 #N.m
+torque_peak   = 1 #°
+
+def get_desired_torque_linear( rate_sign ) :
 
 	if rate_sign*actual_angle < torque_peak :
 		torque_edge = torque_start
@@ -105,10 +106,71 @@ def get_desired_torque( rate_sign ) :
 	desired_torque = torque_middle - ( torque_middle - torque_edge )*abs( actual_angle + rate_sign*torque_peak )/( angle_amplitude - peak_sign*torque_peak )
 
 	# Compensate the non-linearity:
-	if desired_torque > 0 :
-		desired_torque *= 1.2
+	#if -rate_sign > 0 :
+		#desired_torque *= 1.1
 
 	return -rate_sign*desired_torque
+
+
+
+from scipy.optimize import linprog
+
+g  = 9.81 #m.s^-2
+lx = 0.290 #m
+ly = 0.305 #m
+
+m1 = 11.05 #kg
+m2 = 10.47 #kg
+x1 = 0.2041 #m
+y1 = 0.0111 #m
+x2 = 0.2236 #m
+y2 = -0.0139 #m
+
+ballast = 0 #kg
+#ballast = 3 #kg
+xb = 0.285 #m
+
+x1 = ( x1*m1 + xb*ballast )/( m1 + ballast )
+y1 = y1*m1/( m1 + ballast )
+m1 += ballast
+
+def get_desired_torque( rate_sign ) :
+
+	torque_sign = -rate_sign
+
+	b = actual_angle*np.pi/180/2
+	R = np.array( [ [ np.cos( b ), -np.sin( b ) ], [ np.sin( b ), np.cos( b ) ] ] )
+
+	p1 = np.array([  lx,  ly ])
+	p2 = np.array([  lx, -ly ])
+	p3 = np.array([ -lx,  ly ])
+	p4 = np.array([ -lx, -ly ])
+	pm1 = np.array([  x1, y1 ])
+	pm2 = np.array([ -x2, y2 ])
+
+	pG = ( np.dot( m1*R.T, pm1 ) + np.dot( m2*R, pm2 ) )/( m1 + m2 )
+
+	d1 = np.dot( R.T, p1 ) - pG
+	d2 = np.dot( R.T, p2 ) - pG
+	d3 =   np.dot( R, p3 ) - pG
+	d4 =   np.dot( R, p4 ) - pG
+
+	A = np.array([ [ 1, 1, 1, 1, 0 ], [ d1[1], d2[1], d3[1], d4[1], 0 ], [ -d1[0], -d2[0], -d3[0], -d4[0], 0 ], [ 0, 0, ly, -ly, 1 ] ])
+	y = np.array([ ( m1 + m2 )*g, 0, 0, 0 ])
+	C = np.array([ 0, 0, 0, 0, -torque_sign ])
+	res = linprog( C, A_eq=A, b_eq=y, bounds=[ (0,None), (0,None), (0,None), (0,None), (None,None) ] )
+	desired_torque = res.x[-1]
+
+	# Apply a security margin:
+	#desired_torque -= torque_sign*5
+
+	# Compensate the non-linearity:
+	#if desired_torque > 0 :
+		#desired_torque *= 1.1
+
+	return desired_torque
+
+
 
 
 def steer( target_angle ) :
