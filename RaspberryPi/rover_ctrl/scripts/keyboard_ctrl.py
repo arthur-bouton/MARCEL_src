@@ -29,6 +29,8 @@ class Print_manager() :
 
 		if self._current_line > self._top_gap :
 			self._scr.addstr( self._current_line, 0, '_'*( w - 1 ), curses.A_DIM )
+		
+		self._scr.refresh()
 
 
 def callback_info( msg ):
